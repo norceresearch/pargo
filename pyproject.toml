@@ -1,0 +1,28 @@
+[project]
+name = "argus"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Anders Ohma", email = "anoh@norceresearch.no" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>6.0",
+    "loguru>=0.7.3",
+    "pydantic>=2.11.3",
+]
+
+[project.scripts]
+argus = "argus.cli.main:cli"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.400",
+    "pytest>=8.3.5",
+    "ruff-lsp>=0.0.62",
+]

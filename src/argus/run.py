@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+from importlib import import_module
+from inspect import signature
+from json import dumps, loads
+from os import environ
+from pathlib import Path
+
+from loguru import logger
+
+
+def load_and_run(task_name: str, module_name: str):
+    logger.info(f"Running task {task_name} from {module_name}")
+    module = import_module(module_name)
+    func = getattr(module, task_name)
+
+    data = loads(environ.pop("ARGUS_DATA", "{}"))
+    item = loads(environ.pop("ARGUS_ITEM", "{}"))
+    sig = signature(func)
+    inputs = {k: v for k, v in {**data, **item}.items() if k in sig.parameters}
+    result = func(**inputs)
+    return result, data
+
+
+def run_step(task_name: str, module_name: str, write_data: bool = True):
+    result, data = load_and_run(task_name, module_name)
+    result = {} if result is None else result
+    if not isinstance(result, dict):
+        raise ValueError(
+            f"Task `{task_name}` must return a dict or None, got {type(result).__name__}"
+        )
+    data.update(result)
+    logger.info(f"Saving data: {dumps(data)}")
+    if write_data:
+        Path("/tmp/data.json").write_text(dumps(data))
+    return data
+
+
+def run_when(task_name: str, module_name: str):
+    result, _ = load_and_run(task_name, module_name)
+
+    if not isinstance(result, bool):
+        raise ValueError(
+            f"Condition `{task_name}` must return bool, got {type(result).__name__}"
+        )
+
+    Path("/tmp/when.json").write_text(dumps(result))
+    return result
+
+
+def merge_when():
+    from json import dumps, loads
+    from os import environ
+    from pathlib import Path
+
+    if environ["ARGUS_OTHER"].startswith("{{"):
+        data = loads(environ.pop("ARGUS_THEN"))
+    else:
+        data = loads(environ.pop("ARGUS_OTHER"))
+    Path("/tmp/data.json").write_text(dumps(data))
+
+
+def run_foreach(task_name: str, module_name: str):
+    result, _ = load_and_run(task_name, module_name)
+
+    if not isinstance(result, list):
+        raise ValueError(
+            f"Foreach `{task_name}` must return list, got {type(result).__name__}"
+        )
+    Path("/tmp/foreach.json").write_text(dumps(result))
+    return result
+
+
+def merge_foreach():
+    items = loads(environ.pop("ARGUS_DATA", "{}"))
+
+    merged = {}
+    for d in items:
+        for k, v in d.items():
+            merged.setdefault(k, []).append(v)
+
+    for k, vals in merged.items():
+        if all(v == vals[0] for v in vals):
+            merged[k] = vals[0]
+
+    Path("/tmp/data.json").write_text(dumps(merged))
+
+
+def run_init():
+    data = {}
+    for k in list(environ.keys()):
+        if k.startswith("ARGUS_PARAM_"):
+            data[k.removeprefix("ARGUS_PARAM_")] = loads(environ.pop(k))
+    Path("/tmp/data.json").write_text(dumps(data))
