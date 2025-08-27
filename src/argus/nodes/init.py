@@ -25,7 +25,7 @@ class InitNode(Node):
             environ[f"ARGUS_PARAM_{key}"] = dumps(value)
         run_init()
 
-    def to_argo(self, image: str, step_counter: int, step_suffix: str = ""):
+    def to_argo(self, step_counter: int, step_suffix: str = ""):
         script_source = f"from {run_init.__module__} import run_init\nrun_init()"
 
         step_name = f"step{step_counter}{step_suffix}"
@@ -43,7 +43,7 @@ class InitNode(Node):
         template = ArgoScriptTemplate(
             name=self.task_name,
             script=ArgoScript(
-                image=image,
+                image=None,
                 command=["python"],
                 source=script_source,
                 env=env,

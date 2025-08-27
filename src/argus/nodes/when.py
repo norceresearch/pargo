@@ -9,6 +9,7 @@ from ..argo_types.workflows import (
     ArgoParameter,
     ArgoScript,
     ArgoScriptTemplate,
+    ArgoSecretRef,
     ArgoStep,
 )
 from ..run import merge_when, run_when
@@ -21,27 +22,29 @@ WhenTask = Callable[..., bool]
 class When(Node):
     task: WhenTask
     task_name: str = ""
+    image: str | None = None
+    secrets: list[str] | None = None
     _then: StepTask | None = None
     _otherwise: StepTask | None = None
     _prev: str = "when"
 
-    def __init__(self, task: WhenTask):
-        super().__init__(task=task)
+    def __init__(self, task: WhenTask, **kwargs):
+        super().__init__(task=task, **kwargs)
 
     def model_post_init(self, __context):
         self.task_name = self.task.__name__
 
-    def then(self, task: StepTask) -> When:
+    def then(self, task: StepTask, **kwargs) -> When:
         if self._prev != "when":
             raise RuntimeError(".then(...) must follow When(...) ")
-        self._then = StepNode(task=task)
+        self._then = StepNode(task=task, **kwargs)
         self._prev = "then"
         return self
 
-    def otherwise(self, task: StepTask) -> When:
+    def otherwise(self, task: StepTask, **kwargs) -> When:
         if self._prev != "then":
             raise RuntimeError(".otherwise(...) must follow then(...) ")
-        self._otherwise = StepNode(task=task)
+        self._otherwise = StepNode(task=task, **kwargs)
         self._prev = "otherwise"
         return self
 
@@ -54,19 +57,13 @@ class When(Node):
         if result is False:
             self._otherwise.run()
 
-    def to_argo(self, image: str, step_counter: int):
-        when_step, when_templates = self.to_argo_when(
-            image=image, step_counter=step_counter
-        )
-        then_step, then_templates = self.to_argo_then(
-            image=image, step_counter=step_counter
-        )
+    def to_argo(self, step_counter: int):
+        when_step, when_templates = self.to_argo_when(step_counter=step_counter)
+        then_step, then_templates = self.to_argo_then(step_counter=step_counter)
         otherwise_step, otherwise_templates = self.to_argo_otherwise(
-            image=image, step_counter=step_counter
+            step_counter=step_counter
         )
-        merge_step, merge_templates = self.to_argo_merge(
-            image=image, step_counter=step_counter
-        )
+        merge_step, merge_templates = self.to_argo_merge(step_counter=step_counter)
 
         steps = [[when_step], [then_step, otherwise_step], [merge_step]]
         templates = (
@@ -74,7 +71,7 @@ class When(Node):
         )
         return steps, templates
 
-    def to_argo_when(self, image: str, step_counter: int):
+    def to_argo_when(self, step_counter: int):
         script_source = f'from {run_when.__module__} import run_when\nrun_when("{self.task_name}", "{self.task.__module__}")'
 
         step_name = f"step{step_counter}when"
@@ -84,11 +81,17 @@ class When(Node):
                 value=f"{{{{steps.step{step_counter - 1}.outputs.parameters.outputs}}}}",
             )
         ]
+        secrets = None
+        if self.secrets:
+            secrets = [
+                ArgoSecretRef(secretRef=ArgoParameter(name=secret))
+                for secret in self.secrets
+            ]
         templates = [
             ArgoScriptTemplate(
                 name=self.task_name,
                 script=ArgoScript(
-                    image=image,
+                    image=self.image,
                     command=["python"],
                     source=script_source,
                     env=[
@@ -96,6 +99,7 @@ class When(Node):
                             name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"
                         )
                     ],
+                    envFrom=secrets,
                 ),
                 inputs={"parameters": [ArgoParameter(name="inputs")]},
                 outputs={
@@ -114,23 +118,23 @@ class When(Node):
         )
         return when_step, templates
 
-    def to_argo_then(self, image: str, step_counter: int):
-        step, templates = self._then.to_argo(image, step_counter, "then")
+    def to_argo_then(self, step_counter: int):
+        step, templates = self._then.to_argo(step_counter, "then")
         step = step[0][0]  # unpack
         step.when = (
             f"{{{{steps.step{step_counter}when.outputs.parameters.outputs}}}} == true"
         )
         return step, templates
 
-    def to_argo_otherwise(self, image: str, step_counter: int):
-        step, templates = self._otherwise.to_argo(image, step_counter, "otherwise")
+    def to_argo_otherwise(self, step_counter: int):
+        step, templates = self._otherwise.to_argo(step_counter, "otherwise")
         step = step[0][0]  # unpack
         step.when = (
             f"{{{{steps.step{step_counter}when.outputs.parameters.outputs}}}} == false"
         )
         return step, templates
 
-    def to_argo_merge(self, image: str, step_counter: int):
+    def to_argo_merge(self, step_counter: int):
         parameters = [
             ArgoParameter(
                 name="then_output",
@@ -153,7 +157,7 @@ class When(Node):
                 ArgoScriptTemplate(
                     name="whenmerge",
                     script=ArgoScript(
-                        image=image, command=["python"], source=source, env=env
+                        image=self.image, command=["python"], source=source, env=env
                     ),
                     inputs={
                         "parameters": [

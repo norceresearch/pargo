@@ -13,6 +13,7 @@ from .argo_types.workflows import (
     ArgoCronWorkflowSpec,
     ArgoParameter,
     ArgoPodGC,
+    ArgoScriptTemplate,
     ArgoSecretRef,
     ArgoStepsTemplate,
     ArgoTTLStrategy,
@@ -33,7 +34,6 @@ class Workflow(BaseModel):
     schedules: list[str] | None = None
     secrets: list[str] | None = None
     _nodes: list[Node] = []
-    _images: list[str] = []
 
     @classmethod
     def new(cls, name: str, **kwargs) -> Workflow:
@@ -41,13 +41,11 @@ class Workflow(BaseModel):
 
     def model_post_init(self, __context):
         self._nodes.append(InitNode(task=self.parameters))
-        self._images.append(self.image)
 
-    def next(self, node: Node, image: str | None = None) -> Workflow:
+    def next(self, node: Node, **kwargs) -> Workflow:
         if callable(node):
-            node = StepNode(task=node)
+            node = StepNode(task=node, **kwargs)
         self._nodes.append(node)
-        self._images.append(image or self.image)
         return self
 
     def run(self):
@@ -59,26 +57,14 @@ class Workflow(BaseModel):
     def to_argo(self):
         steps = []
         templates = []
-        for ind, (node, image) in enumerate(zip(self._nodes, self._images)):
-            s, t = node.to_argo(image, ind)
+        for ind, node in enumerate(self._nodes):
+            s, t = node.to_argo(ind)
             steps.extend(s)
             templates.extend(t)
 
-        # Remove dublicated templates and add main
-        templates = [
-            template
-            for n, template in enumerate(templates)
-            if template not in templates[:n]
-        ]
-
-        # Add secrets
-        if self.secrets:
-            secrets = [
-                ArgoSecretRef(secretRef=ArgoParameter(name=secret))
-                for secret in self.secrets
-            ]
-            for template in templates:
-                template.script.envFrom = secrets
+        templates = self._remove_duplicated_templates(templates)
+        self._add_default_image(templates)
+        self._add_default_secrets(templates)
 
         templates = [ArgoStepsTemplate(name="main", steps=steps)] + templates
 
@@ -125,3 +111,33 @@ class Workflow(BaseModel):
             Path(path / (self.name + "-cron.yaml")).write_text(
                 safe_dump(yaml_str, sort_keys=False)
             )
+
+    @staticmethod
+    def _remove_duplicated_templates(
+        templates: list[ArgoScriptTemplate],
+    ) -> list[ArgoScriptTemplate]:
+        templates = [
+            template
+            for n, template in enumerate(templates)
+            if template not in templates[:n]
+        ]
+        template_names = [template.name for template in templates]
+        if len(template_names) > len(set(template_names)):
+            raise RuntimeError(
+                "Duplicate task detected: The same task is provided with different kwargs (image, secrets etc)."
+            )
+        return templates
+
+    def _add_default_image(self, templates: list[ArgoScriptTemplate]):
+        for template in templates:
+            template.script.image = template.script.image or self.image
+
+    def _add_default_secrets(self, templates: list[ArgoScriptTemplate]):
+        secrets = None
+        if self.secrets:
+            secrets = [
+                ArgoSecretRef(secretRef=ArgoParameter(name=secret))
+                for secret in self.secrets
+            ]
+        for template in templates:
+            template.script.envFrom = template.script.envFrom or secrets

@@ -77,7 +77,7 @@ class ArgoStepsTemplate(BaseModel):
 
 
 class ArgoScript(BaseModel):
-    image: str
+    image: str | None
     command: list
     source: str = Field(..., alias="source")
     envFrom: list[ArgoSecretRef] | None = None

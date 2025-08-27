@@ -9,6 +9,7 @@ from ..argo_types.workflows import (
     ArgoParameter,
     ArgoScript,
     ArgoScriptTemplate,
+    ArgoSecretRef,
     ArgoStep,
 )
 from ..run import run_step
@@ -20,6 +21,8 @@ StepTask = Callable[..., None | dict]
 class StepNode(Node):
     task: StepTask
     task_name: str = ""
+    image: str | None = None
+    secrets: list[str] | None = None
 
     def model_post_init(self, __context):
         self.task_name = self.task.__name__
@@ -30,7 +33,7 @@ class StepNode(Node):
         result = run_step(self.task_name, self.task.__module__, write_data=write_data)
         return result
 
-    def to_argo(self, image: str, step_counter: int, step_suffix: str = ""):
+    def to_argo(self, step_counter: int, step_suffix: str = ""):
         script_source = f'from {run_step.__module__} import run_step\nrun_step("{self.task_name}", "{self.task.__module__}")'
 
         step_name = f"step{step_counter}{step_suffix}"
@@ -45,11 +48,17 @@ class StepNode(Node):
             template=self.task_name,
             arguments={"parameters": parameters},
         )
+        secrets = None
+        if self.secrets:
+            secrets = [
+                ArgoSecretRef(secretRef=ArgoParameter(name=secret))
+                for secret in self.secrets
+            ]
 
         template = ArgoScriptTemplate(
             name=self.task_name,
             script=ArgoScript(
-                image=image,
+                image=self.image,
                 command=["python"],
                 source=script_source,
                 env=[
@@ -57,6 +66,7 @@ class StepNode(Node):
                         name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"
                     )
                 ],
+                envFrom=secrets,
             ),
             inputs={"parameters": [ArgoParameter(name="inputs")]},
             outputs={
