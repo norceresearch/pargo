@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from yaml import safe_dump
 
 from .argo_types.workflows import (
+    ArgoCronWorkflow,
+    ArgoCronWorkflowSpec,
     ArgoParameter,
     ArgoPodGC,
     ArgoSecretRef,
@@ -17,6 +19,7 @@ from .argo_types.workflows import (
     ArgoWorkflow,
     ArgoWorkflowMetadata,
     ArgoWorkflowSpec,
+    ArgoWorkflowTemplateRef,
 )
 from .nodes.init import InitNode
 from .nodes.node import Node
@@ -79,29 +82,46 @@ class Workflow(BaseModel):
 
         templates = [ArgoStepsTemplate(name="main", steps=steps)] + templates
 
-        kind = (
-            "CronWorkflowTemplate" if self.schedules is not None else "WorkflowTemplate"
+        spec = ArgoWorkflowSpec(
+            entrypoint="main",
+            arguments={
+                "parameters": [
+                    {"name": k, "value": dumps(v), "default": dumps(v)}
+                    for k, v in self.parameters.items()
+                ]
+            },
+            templates=templates,
+            schedules=self.schedules,
+            ttlStrategy=ArgoTTLStrategy(),
+            podGC=ArgoPodGC(),
         )
+
         wf = ArgoWorkflow(
-            kind=kind,
+            kind="WorkflowTemplate",
             metadata=ArgoWorkflowMetadata(name=self.name),
-            spec=ArgoWorkflowSpec(
-                entrypoint="main",
-                arguments={
-                    "parameters": [
-                        {"name": k, "default": dumps(v)}
-                        for k, v in self.parameters.items()
-                    ]
-                },
-                templates=templates,
-                schedules=self.schedules,
-                ttlStrategy=ArgoTTLStrategy(),
-                podGC=ArgoPodGC(),
-            ),
+            spec=spec,
         )
         return wf
 
-    def to_yaml(self, path="workflow.yaml"):
+    def to_yaml(self, path=""):
         wf = self.to_argo()
         yaml_str = wf.model_dump(exclude_none=True)
-        Path(path).write_text(safe_dump(yaml_str, sort_keys=False))
+        Path(path / (self.name + ".yaml")).write_text(
+            safe_dump(yaml_str, sort_keys=False)
+        )
+
+        if self.schedules:
+            wf = ArgoCronWorkflow(
+                kind="CronWorkflowTemplate",
+                metadata=ArgoWorkflowMetadata(name=self.name),
+                spec=ArgoCronWorkflowSpec(
+                    schedules=self.schedules,
+                    workflowSpec=ArgoWorkflowTemplateRef(
+                        workflowTemplateRef=ArgoParameter(name=self.name)
+                    ),
+                ),
+            )
+            yaml_str = wf.model_dump(exclude_none=True)
+            Path(path / (self.name + "-cron.yaml")).write_text(
+                safe_dump(yaml_str, sort_keys=False)
+            )

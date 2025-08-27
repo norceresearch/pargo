@@ -47,13 +47,19 @@ class ArgoWorkflowSpec(BaseModel):
     ttlStrategy: ArgoTTLStrategy | None = None
     podGC: ArgoPodGC | None = None
 
+
+class ArgoWorkflowTemplateRef(BaseModel):
+    workflowTemplateRef: ArgoParameter
+
+
+class ArgoCronWorkflowSpec(BaseModel):
     schedules: list[str] | None = None
     timezone: str | None = None
     concurrencyPolicy: str | None = None
     startingDeadlineSeconds: int | None = None
     successfulJobsHistoryLimit: int | None = None
     failedJobsHistoryLimit: int | None = None
-    workflowSpec: ArgoWorkflowSpec | None = None
+    workflowSpec: ArgoWorkflowTemplateRef | None = None
 
 
 class ArgoStep(BaseModel):
@@ -93,3 +99,10 @@ class ArgoWorkflow(BaseModel):
     kind: str = "Workflow"
     metadata: ArgoWorkflowMetadata
     spec: ArgoWorkflowSpec
+
+
+class ArgoCronWorkflow(BaseModel):
+    apiVersion: str = "argoproj.io/v1alpha1"
+    kind: str = "Workflow"
+    metadata: ArgoWorkflowMetadata
+    spec: ArgoCronWorkflowSpec
