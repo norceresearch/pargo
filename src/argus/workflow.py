@@ -25,6 +25,7 @@ from .argo_types.workflows import (
 from .nodes.init import InitNode
 from .nodes.node import Node
 from .nodes.step import StepNode
+from .sensor import Sensor, TriggerOn
 
 
 class Workflow(BaseModel):
@@ -33,6 +34,7 @@ class Workflow(BaseModel):
     image: str = "python:3.11"
     schedules: list[str] | None = None
     secrets: list[str] | None = None
+    trigger_on: str | list[str] | list[TriggerOn] | None = None
     _nodes: list[Node] = []
 
     @classmethod
@@ -97,20 +99,27 @@ class Workflow(BaseModel):
         )
 
         if self.schedules:
-            wf = ArgoCronWorkflow(
-                kind="CronWorkflowTemplate",
-                metadata=ArgoWorkflowMetadata(name=self.name),
-                spec=ArgoCronWorkflowSpec(
-                    schedules=self.schedules,
-                    workflowSpec=ArgoWorkflowTemplateRef(
-                        workflowTemplateRef=ArgoParameter(name=self.name)
-                    ),
+            self.to_yaml_cron(path=path)
+
+        if self.trigger_on:
+            sensor = Sensor(name=self.name, trigger_on=self.trigger_on)
+            sensor.to_yaml(path=path)
+
+    def to_yaml_cron(self, path):
+        wf = ArgoCronWorkflow(
+            kind="CronWorkflowTemplate",
+            metadata=ArgoWorkflowMetadata(name=self.name),
+            spec=ArgoCronWorkflowSpec(
+                schedules=self.schedules,
+                workflowSpec=ArgoWorkflowTemplateRef(
+                    workflowTemplateRef=ArgoParameter(name=self.name)
                 ),
-            )
-            yaml_str = wf.model_dump(exclude_none=True)
-            Path(path / (self.name + "-cron.yaml")).write_text(
-                safe_dump(yaml_str, sort_keys=False)
-            )
+            ),
+        )
+        yaml_str = wf.model_dump(exclude_none=True)
+        Path(path / (self.name + "-cron.yaml")).write_text(
+            safe_dump(yaml_str, sort_keys=False)
+        )
 
     @staticmethod
     def _remove_duplicated_templates(
