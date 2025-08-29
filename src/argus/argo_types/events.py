@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from .workflows import ArgoParameter
+
 
 class ArgoWorkflowTemplateRef(BaseModel):
     name: str
@@ -7,6 +9,7 @@ class ArgoWorkflowTemplateRef(BaseModel):
 
 class ArgoWorkflowSpec(BaseModel):
     workflowTemplateRef: ArgoWorkflowTemplateRef
+    arguments: dict[str, list[ArgoParameter]] | None = None
 
 
 class ArgoWorkflowMetadata(BaseModel):

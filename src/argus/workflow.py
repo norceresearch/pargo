@@ -25,7 +25,8 @@ from .argo_types.workflows import (
 from .nodes.init import InitNode
 from .nodes.node import Node
 from .nodes.step import StepNode
-from .sensor import Sensor, TriggerOn
+from .sensor import Sensor
+from .trigger_condition import Condition
 
 
 class Workflow(BaseModel):
@@ -34,7 +35,8 @@ class Workflow(BaseModel):
     image: str = "python:3.11"
     schedules: list[str] | None = None
     secrets: list[str] | None = None
-    trigger_on: str | list[str] | list[TriggerOn] | None = None
+    trigger_on: Workflow | Condition = None
+    trigger_on_parameters: list[dict[str, Any]] | None = None
     _nodes: list[Node] = []
 
     @classmethod
@@ -43,6 +45,15 @@ class Workflow(BaseModel):
 
     def model_post_init(self, __context):
         self._nodes.append(InitNode(task=self.parameters))
+
+        if isinstance(self.trigger_on, Workflow):
+            self.trigger_on = Condition(items=[self.trigger_on.name])
+
+        if self.trigger_on_parameters:
+            if len(self.trigger_on_parameters) != len(self.trigger_on):
+                raise ValueError(
+                    "trigger_on_parameters must be same length as number of OR statements when defined."
+                )
 
     def next(self, node: Node, **kwargs) -> Workflow:
         if callable(node):
@@ -102,7 +113,11 @@ class Workflow(BaseModel):
             self.to_yaml_cron(path=path)
 
         if self.trigger_on:
-            sensor = Sensor(name=self.name, trigger_on=self.trigger_on)
+            sensor = Sensor(
+                name=self.name,
+                trigger_on=self.trigger_on,
+                parameters=self.trigger_on_parameters,
+            )
             sensor.to_yaml(path=path)
 
     def to_yaml_cron(self, path):
@@ -150,3 +165,26 @@ class Workflow(BaseModel):
             ]
         for template in templates:
             template.script.envFrom = template.script.envFrom or secrets
+
+    def __and__(self, other):
+        if isinstance(other, Workflow):
+            if self.name == other.name:
+                return Condition(items=[self.name])
+            return Condition(items=[f"{self.name} && {other.name}"])
+        else:
+            if len(other.items) > 1:
+                raise ValueError("Invalid: cannot do (A | B) & C")
+            return Condition(items=[f"{self.name} && {other.items[0]}"])
+
+    def __or__(self, other):
+        if isinstance(other, Workflow):
+            if self.name == other.name:
+                return Condition(items=[self.name])
+            return Condition(items=[self.name, other.name])
+        else:
+            return Condition(items=[self.name] + other.items)
+
+
+# Rebuilding the pydantic model after Workflow is defined
+Condition.model_rebuild()
+Sensor.model_rebuild()

@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+from json import dumps
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
 from yaml import safe_dump
@@ -21,26 +25,18 @@ from .argo_types.events import (
     ArgoWorkflowTrigger,
 )
 
-
-class TriggerOn(BaseModel):
-    flows: list[str]
+if TYPE_CHECKING:
+    from .workflow import Condition
 
 
 class Sensor(BaseModel):
     name: str
-    trigger_on: str | list[str] | list[TriggerOn]
-
-    def model_post_init(self, __context):
-        if isinstance(self.trigger_on, str):
-            self.trigger_on = [TriggerOn(flows=[self.trigger_on])]
-        elif isinstance(self.trigger_on, list):
-            self.trigger_on = [TriggerOn(flows=self.trigger_on)]
+    trigger_on: Condition
+    parameters: list[dict[str, Any]] | None = None
 
     def argo_dependencies(self):
-        dependency_names = [flow for t in self.trigger_on for flow in t.flows]
-        dependency_names = list(set(dependency_names))  # remove dublicates
         dependencies = []
-        for name in dependency_names:
+        for name in self.trigger_on.names:
             dependencies.append(
                 ArgoDependency(
                     name=name,
@@ -65,13 +61,28 @@ class Sensor(BaseModel):
         return dependencies
 
     def argo_triggers(self):
-        conditions = [" && ".join(t.flows) for t in self.trigger_on]
+        if self.parameters:
+            arguments = []
+            for parameters in self.parameters:
+                arguments.append(
+                    {
+                        "parameters": [
+                            {"name": k, "value": dumps(v)}
+                            for k, v in parameters.items()
+                        ]
+                    },
+                )
+        else:
+            arguments = [None] * len(self.trigger_on)
+
         triggers = []
-        for condition in conditions:
+        for ind, (condition, argument) in enumerate(
+            zip(self.trigger_on.items, arguments)
+        ):
             triggers.append(
                 ArgoTrigger(
                     template=ArgoTriggerTemplate(
-                        name=self.name,
+                        name=self.name + str(ind),
                         conditions=condition,
                         argoWorkflow=ArgoWorkflowTrigger(
                             group="argoproj.io",
@@ -89,7 +100,8 @@ class Sensor(BaseModel):
                                     spec=ArgoWorkflowSpec(
                                         workflowTemplateRef=ArgoWorkflowTemplateRef(
                                             name=self.name
-                                        )
+                                        ),
+                                        arguments=argument,
                                     ),
                                 )
                             ),
