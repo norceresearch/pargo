@@ -1,0 +1,21 @@
+variables:
+  UV_SYSTEM_PYTHON: 1
+
+default:
+  before_script:
+    - curl -LsSf https://astral.sh/uv/install.sh | sh  # Install UV
+    - source ~/.local/bin/env  # add uv to current shell env
+
+build-test-libs-argus:
+  stage: libs/argus
+  image: python:3.12
+  script:
+    - pushd libs/argus
+    - uv build --wheel
+    - uv sync --locked
+    - uv run pre-commit run --all-files
+    - uv run pytest
+  artifacts:
+    paths:
+      - libs/argus/dist/
+    expire_in: 1 week
