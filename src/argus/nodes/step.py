@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from json import dumps, loads
 from os import environ
-from pathlib import Path
 from typing import Callable
 
 from ..argo_types.workflows import (
@@ -12,8 +11,8 @@ from ..argo_types.workflows import (
     ArgoSecretRef,
     ArgoStep,
 )
-from ..run import run_step
 from .node import Node
+from .run import argus_path, run_step
 
 StepTask = Callable[..., None | dict]
 
@@ -28,7 +27,8 @@ class StepNode(Node):
         self.task_name = self.task.__name__
 
     def run(self, write_data: bool = True):
-        data = loads(Path("/tmp/data.json").read_text())
+        data_path = argus_path() / "data.json"
+        data = loads(data_path.read_text())
         environ["ARGUS_DATA"] = dumps(data)
         result = run_step(self.task_name, self.task.__module__, write_data=write_data)
         return result
@@ -64,7 +64,8 @@ class StepNode(Node):
                 env=[
                     ArgoParameter(
                         name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"
-                    )
+                    ),
+                    ArgoParameter(name="ARGUS_DIR", value="/tmp"),
                 ],
                 envFrom=secrets,
             ),

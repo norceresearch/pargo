@@ -56,18 +56,21 @@ class Workflow(BaseModel):
                 )
 
     def next(self, node: Node, **kwargs) -> Workflow:
+        """Add steps to the workflow"""
         if callable(node):
             node = StepNode(task=node, **kwargs)
         self._nodes.append(node)
         return self
 
     def run(self):
+        """Run the workflow locally."""
         logger.info("Workflow started")
         for step in self._nodes:
             step.run()
         logger.info("Workflow ended")
 
     def to_argo(self):
+        """Generate a pydantic model of the workflow."""
         steps = []
         templates = []
         for ind, node in enumerate(self._nodes):
@@ -103,6 +106,7 @@ class Workflow(BaseModel):
         return wf
 
     def to_yaml(self, path=""):
+        """Write manifest(s) to run the workflow on Argo Workflows."""
         wf = self.to_argo()
         yaml_str = wf.model_dump(exclude_none=True)
         Path(path / (self.name + ".yaml")).write_text(
@@ -121,6 +125,7 @@ class Workflow(BaseModel):
             sensor.to_yaml(path=path)
 
     def to_yaml_cron(self, path):
+        """Write manifest for scheduled execution on Argo Workflows."""
         wf = ArgoCronWorkflow(
             kind="CronWorkflowTemplate",
             metadata=ArgoWorkflowMetadata(name=self.name),
@@ -140,6 +145,7 @@ class Workflow(BaseModel):
     def _remove_duplicated_templates(
         templates: list[ArgoScriptTemplate],
     ) -> list[ArgoScriptTemplate]:
+        """Removes duplicated templates (Tasks that are given more than once)."""
         templates = [
             template
             for n, template in enumerate(templates)
@@ -153,10 +159,12 @@ class Workflow(BaseModel):
         return templates
 
     def _add_default_image(self, templates: list[ArgoScriptTemplate]):
+        """Adds default image to steps with no explicit image."""
         for template in templates:
             template.script.image = template.script.image or self.image
 
     def _add_default_secrets(self, templates: list[ArgoScriptTemplate]):
+        """Adds default secrets to steps with no explicit secrets."""
         secrets = None
         if self.secrets:
             secrets = [

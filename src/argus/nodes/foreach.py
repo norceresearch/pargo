@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from json import dumps, loads
 from os import environ
-from pathlib import Path
 from typing import Any, Callable
 
 from loguru import logger
@@ -14,8 +13,8 @@ from ..argo_types.workflows import (
     ArgoSecretRef,
     ArgoStep,
 )
-from ..run import merge_foreach, run_foreach
 from .node import Node
+from .run import argus_path, merge_foreach, run_foreach
 from .step import StepNode, StepTask
 
 ForeachTask = Callable[..., list[Any]]
@@ -27,8 +26,7 @@ class Foreach(Node):
     item_name: str = "item"
     image: str | None = None
     secrets: list[str] | None = None
-    _then: StepTask | None = None
-    _join: StepTask | None = None
+    _then: StepNode | None = None
     _prev: str = "foreach"
 
     def __init__(
@@ -51,8 +49,9 @@ class Foreach(Node):
 
     def run(self):
         logger.info("Running foreach loop")
+        data_path = argus_path() / "data.json"
         if callable(self.task):
-            data = loads(Path("/tmp/data.json").read_text())
+            data = loads(data_path.read_text())
             environ["ARGUS_DATA"] = dumps(data)
             items = run_foreach(self.task_name, self.task.__module__)
         elif isinstance(self.task, list):
@@ -64,7 +63,7 @@ class Foreach(Node):
             environ["ARGUS_ITEM"] = dumps({self.item_name: item})
             result = self._then.run(write_data=False)
             results.append(result)
-        Path("/tmp/data.json").write_text(dumps(results))
+        data_path.write_text(dumps(results))
 
         environ["ARGUS_DATA"] = dumps(results)
         merge_foreach()
@@ -127,7 +126,8 @@ class Foreach(Node):
                 env=[
                     ArgoParameter(
                         name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"
-                    )
+                    ),
+                    ArgoParameter(name="ARGUS_DIR", value="/tmp"),
                 ],
                 envFrom=secrets,
             ),
@@ -158,6 +158,7 @@ class Foreach(Node):
             )
         ]
         env = [ArgoParameter(name="ARGUS_DATA", value="{{inputs.parameters.inputs}}")]
+        env.append(ArgoParameter(name="ARGUS_DIR", value="/tmp"))
         script_source = (
             f"from {merge_foreach.__module__} import merge_foreach\nmerge_foreach()"
         )

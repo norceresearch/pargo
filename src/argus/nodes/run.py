@@ -22,6 +22,12 @@ def load_and_run(task_name: str, module_name: str):
     return result, data
 
 
+def argus_path():
+    argus_path = Path(environ.get("ARGUS_DIR", Path.cwd() / ".argus"))
+    argus_path.mkdir(exist_ok=True)
+    return argus_path
+
+
 def run_step(task_name: str, module_name: str, write_data: bool = True):
     result, data = load_and_run(task_name, module_name)
     result = {} if result is None else result
@@ -32,7 +38,8 @@ def run_step(task_name: str, module_name: str, write_data: bool = True):
     data.update(result)
     logger.info(f"Saving data: {dumps(data)}")
     if write_data:
-        Path("/tmp/data.json").write_text(dumps(data))
+        data_path = argus_path() / "data.json"
+        data_path.write_text(dumps(data))
     return data
 
 
@@ -43,21 +50,21 @@ def run_when(task_name: str, module_name: str):
         raise ValueError(
             f"Condition `{task_name}` must return bool, got {type(result).__name__}"
         )
-
-    Path("/tmp/when.json").write_text(dumps(result))
+    when_path = argus_path() / "when.json"
+    when_path.write_text(dumps(result))
     return result
 
 
 def merge_when():
     from json import dumps, loads
     from os import environ
-    from pathlib import Path
 
     if environ["ARGUS_OTHER"].startswith("{{"):
         data = loads(environ.pop("ARGUS_THEN"))
     else:
         data = loads(environ.pop("ARGUS_OTHER"))
-    Path("/tmp/data.json").write_text(dumps(data))
+    data_path = argus_path() / "data.json"
+    data_path.write_text(dumps(data))
 
 
 def run_foreach(task_name: str, module_name: str):
@@ -67,7 +74,8 @@ def run_foreach(task_name: str, module_name: str):
         raise ValueError(
             f"Foreach `{task_name}` must return list, got {type(result).__name__}"
         )
-    Path("/tmp/foreach.json").write_text(dumps(result))
+    foreach_path = argus_path() / "foreach.json"
+    foreach_path.write_text(dumps(result))
     return result
 
 
@@ -83,7 +91,8 @@ def merge_foreach():
         if all(v == vals[0] for v in vals):
             merged[k] = vals[0]
 
-    Path("/tmp/data.json").write_text(dumps(merged))
+    data_path = argus_path() / "data.json"
+    data_path.write_text(dumps(merged))
 
 
 def run_init():
@@ -91,4 +100,5 @@ def run_init():
     for k in list(environ.keys()):
         if k.startswith("ARGUS_PARAM_"):
             data[k.removeprefix("ARGUS_PARAM_")] = loads(environ.pop(k))
-    Path("/tmp/data.json").write_text(dumps(data))
+    data_path = argus_path() / "data.json"
+    data_path.write_text(dumps(data))

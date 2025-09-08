@@ -10,8 +10,8 @@ from ..argo_types.workflows import (
     ArgoScriptTemplate,
     ArgoStep,
 )
-from ..run import run_init
 from .node import Node
+from .run import run_init
 
 InitTask = dict[str, Any]
 
@@ -40,6 +40,7 @@ class InitNode(Node):
             )
             for k in self.task.keys()
         ]
+        env.append(ArgoParameter(name="ARGUS_DIR", value="/tmp"))
         template = ArgoScriptTemplate(
             name=self.task_name,
             script=ArgoScript(

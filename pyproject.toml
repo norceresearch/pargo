@@ -23,6 +23,10 @@ build-backend = "setuptools.build_meta"
 [dependency-groups]
 dev = [
     "pyright>=1.1.400",
+    "pre-commit>=4.0.1",
     "pytest>=8.3.5",
     "ruff-lsp>=0.0.62",
 ]
+
+[tool.ruff]
+exclude = [".venv", "src/mimir/protobuf"]

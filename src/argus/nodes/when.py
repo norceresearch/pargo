@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from json import dumps, loads
 from os import environ
-from pathlib import Path
 from typing import Callable
 
 from ..argo_types.workflows import (
@@ -12,8 +11,8 @@ from ..argo_types.workflows import (
     ArgoSecretRef,
     ArgoStep,
 )
-from ..run import merge_when, run_when
 from .node import Node
+from .run import argus_path, merge_when, run_when
 from .step import StepNode, StepTask
 
 WhenTask = Callable[..., bool]
@@ -24,8 +23,8 @@ class When(Node):
     task_name: str = ""
     image: str | None = None
     secrets: list[str] | None = None
-    _then: StepTask | None = None
-    _otherwise: StepTask | None = None
+    _then: StepNode | None = None
+    _otherwise: StepNode | None = None
     _prev: str = "when"
 
     def __init__(self, task: WhenTask, **kwargs):
@@ -49,7 +48,8 @@ class When(Node):
         return self
 
     def run(self):
-        data = loads(Path("/tmp/data.json").read_text())
+        data_path = argus_path() / "data.json"
+        data = loads(data_path.read_text())
         environ["ARGUS_DATA"] = dumps(data)
         result = run_when(self.task_name, self.task.__module__)
         if result is True:
@@ -97,7 +97,8 @@ class When(Node):
                     env=[
                         ArgoParameter(
                             name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"
-                        )
+                        ),
+                        ArgoParameter(name="ARGUS_DIR", value="/tmp"),
                     ],
                     envFrom=secrets,
                 ),
@@ -150,6 +151,7 @@ class When(Node):
             ArgoParameter(
                 name="ARGUS_OTHER", value="{{inputs.parameters.otherwise_output}}"
             ),
+            ArgoParameter(name="ARGUS_DIR", value="/tmp"),
         ]
         source = f"from {merge_when.__module__} import merge_when\nmerge_when()"
         templates = [
