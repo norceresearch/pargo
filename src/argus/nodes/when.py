@@ -20,7 +20,6 @@ WhenTask = Callable[..., bool]
 
 class When(Node):
     task: WhenTask
-    task_name: str = ""
     image: str | None = None
     secrets: list[str] | None = None
     _then: StepNode | None = None
@@ -29,9 +28,6 @@ class When(Node):
 
     def __init__(self, task: WhenTask, **kwargs):
         super().__init__(task=task, **kwargs)
-
-    def model_post_init(self, __context):
-        self.task_name = self.task.__name__
 
     def then(self, task: StepTask, **kwargs) -> When:
         if self._prev != "when":
@@ -51,7 +47,7 @@ class When(Node):
         data_path = argus_path() / "data.json"
         data = loads(data_path.read_text())
         environ["ARGUS_DATA"] = dumps(data)
-        result = run_when(self.task_name, self.task.__module__)
+        result = run_when(self.task.__name__, self.task.__module__)
         if result is True:
             self._then.run()
         if result is False:
@@ -72,7 +68,7 @@ class When(Node):
         return steps, templates
 
     def to_argo_when(self, step_counter: int):
-        script_source = f'from {run_when.__module__} import run_when\nrun_when("{self.task_name}", "{self.task.__module__}")'
+        script_source = f'from {run_when.__module__} import run_when\nrun_when("{self.task.__name__}", "{self.task.__module__}")'
 
         step_name = f"step{step_counter}when"
         parameters = [
@@ -87,9 +83,10 @@ class When(Node):
                 ArgoSecretRef(secretRef=ArgoParameter(name=secret))
                 for secret in self.secrets
             ]
+        image_pull_policy = "Always" if self.image else None
         templates = [
             ArgoScriptTemplate(
-                name=self.task_name,
+                name=step_name,
                 script=ArgoScript(
                     image=self.image,
                     command=["python"],
@@ -101,6 +98,7 @@ class When(Node):
                         ArgoParameter(name="ARGUS_DIR", value="/tmp"),
                     ],
                     envFrom=secrets,
+                    imagePullPolicy=image_pull_policy,
                 ),
                 inputs={"parameters": [ArgoParameter(name="inputs")]},
                 outputs={
@@ -114,7 +112,7 @@ class When(Node):
         ]
         when_step = ArgoStep(
             name=step_name,
-            template=self.task_name,
+            template=step_name,
             arguments={"parameters": parameters},
         )
         return when_step, templates
@@ -159,7 +157,7 @@ class When(Node):
                 ArgoScriptTemplate(
                     name="whenmerge",
                     script=ArgoScript(
-                        image=self.image, command=["python"], source=source, env=env
+                        image=None, command=["python"], source=source, env=env
                     ),
                     inputs={
                         "parameters": [

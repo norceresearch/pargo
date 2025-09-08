@@ -23,7 +23,7 @@ def test_run_step(tmp_path):
     assert "x" in result and result["x"] == 6
 
 
-@pytest.mark.parametrize("task", ["choice", "getitems"])
+@pytest.mark.parametrize("task", ["choice", "get_items"])
 def test_run_step_task_with_invalid_return_type(tmp_path, task):
     """run_step should return None or dict[str, Any]. Test that it fails for invalid return types (bool, list)."""
     (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 3}))
@@ -61,7 +61,7 @@ def test_merge_when_otherwise(tmp_path):
     assert merged["x"] == 1
 
 
-@pytest.mark.parametrize("task", ["double", "triple", "getitems"])
+@pytest.mark.parametrize("task", ["double", "triple", "get_items"])
 def test_run_when_task_with_invalid_return_type(tmp_path, task):
     """run_when should return a boolean. Test that it fails for invalid return types (dict, dict, list)."""
     (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 3}))
@@ -74,7 +74,7 @@ def test_run_when_task_with_invalid_return_type(tmp_path, task):
 def test_run_foreach(tmp_path):
     """Test that run_foreach produces the expected output."""
     environ["ARGUS_DATA"] = dumps({})
-    res = run_foreach("getitems", utils.__name__)
+    res = run_foreach("get_items", utils.__name__)
     assert isinstance(res, list)
     assert (tmp_path / ".argus" / "foreach.json").exists()
 

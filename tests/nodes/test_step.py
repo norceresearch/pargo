@@ -19,5 +19,5 @@ def test_stepnode_to_argo():
     node = StepNode(task=double)
     steps, templates = node.to_argo(1)
     assert steps[0][0].name == "step1"
-    assert templates[0].name == "double"
+    assert templates[0].name == "step1"
     assert "python" in templates[0].script.command

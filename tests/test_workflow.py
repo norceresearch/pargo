@@ -8,7 +8,7 @@ import pytest
 from pydantic_core._pydantic_core import ValidationError
 
 from argus import Foreach, When, Workflow
-from argus.utils import additem, choice, double, getitems, triple
+from argus.utils import add_item, choice, double, get_items, triple
 
 
 def lint_yaml(tmp_path):
@@ -68,21 +68,20 @@ def test_workflow_yaml_consistency(tmp_path):
 
 
 def test_workflow_duplicate_templates():
-    """Test that identical duplicated templates are allowed and that non-identical fails.
+    """Test that duplicated templates are allowed."""
 
-    TODO Non-identical templates are not allowed atm because of some awkward code.
-    The task name and function name are identical (taken from function.__name__),
-    and argo does not allow for duplicated template names (things like image sits in the template).
-    For identical duplicates this works, as the template is only given once but referred to several times.
-    We should change this to generate some unique name for Argo to remove this problem and other related problems.
-    For instance, Argo only accepts alphanumeric + dash in names, meaning that python functions with e.g. underscore
-    will fail in the current implementation. The unique name must be deterministic.
-    """
     testflow = Workflow.new("testflow", parameters={"x": 1})
-    argo_testflow = testflow.next(double).next(double).to_argo()
-    assert argo_testflow.spec.templates[2].name == "double"
-    with pytest.raises(RuntimeError):
-        testflow.next(double).next(double, image="breaking-image").to_argo()
+    argo_testflow = (
+        testflow.next(double).next(double).next(double, image="OTHER_IMAGE").to_argo()
+    )
+    assert argo_testflow.spec.templates[2].name == "step1"
+    assert argo_testflow.spec.templates[3].name == "step2"
+    assert argo_testflow.spec.templates[4].name == "step3"
+
+    testflow.run()
+    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    result = loads(data_path.read_text())
+    assert result["x"] == 8
 
 
 def test_workflow_schedule(tmp_path):
@@ -197,8 +196,8 @@ def test_workflow_complex(tmp_path):
         )
         .next(double)
         .next(When(choice).then(double).otherwise(triple))
-        .next(Foreach(getitems).then(double))
-        .next(Foreach([1, 5, 3], item_name="item").then(additem))
+        .next(Foreach(get_items).then(double))
+        .next(Foreach([1, 5, 3], item_name="item").then(add_item))
     )
 
     testflow.run()

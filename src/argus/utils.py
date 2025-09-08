@@ -20,16 +20,16 @@ def choice(x: int):
     return x % 3 == 0
 
 
-def getitems():
+def get_items():
     logger.info("Getting items for loop")
     return [1, 2, 3]
 
 
-def additem(item: int, x: int):
+def add_item(item: int, x: int):
     logger.info(f"Adding {item} to x")
     return {"x": item + x}
 
 
-def addy(x: int, y: int):
+def add_y(x: int, y: int):
     logger.info("Adding y to x")
     return {"x": x + y, "y": y}

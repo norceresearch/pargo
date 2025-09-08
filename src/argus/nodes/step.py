@@ -19,22 +19,20 @@ StepTask = Callable[..., None | dict]
 
 class StepNode(Node):
     task: StepTask
-    task_name: str = ""
     image: str | None = None
     secrets: list[str] | None = None
-
-    def model_post_init(self, __context):
-        self.task_name = self.task.__name__
 
     def run(self, write_data: bool = True):
         data_path = argus_path() / "data.json"
         data = loads(data_path.read_text())
         environ["ARGUS_DATA"] = dumps(data)
-        result = run_step(self.task_name, self.task.__module__, write_data=write_data)
+        result = run_step(
+            self.task.__name__, self.task.__module__, write_data=write_data
+        )
         return result
 
     def to_argo(self, step_counter: int, step_suffix: str = ""):
-        script_source = f'from {run_step.__module__} import run_step\nrun_step("{self.task_name}", "{self.task.__module__}")'
+        script_source = f'from {run_step.__module__} import run_step\nrun_step("{self.task.__name__}", "{self.task.__module__}")'
 
         step_name = f"step{step_counter}{step_suffix}"
         parameters = [
@@ -45,7 +43,7 @@ class StepNode(Node):
         ]
         step = ArgoStep(
             name=step_name,
-            template=self.task_name,
+            template=step_name,
             arguments={"parameters": parameters},
         )
         secrets = None
@@ -54,9 +52,9 @@ class StepNode(Node):
                 ArgoSecretRef(secretRef=ArgoParameter(name=secret))
                 for secret in self.secrets
             ]
-
+        image_pull_policy = "Always" if self.image else None
         template = ArgoScriptTemplate(
-            name=self.task_name,
+            name=step_name,
             script=ArgoScript(
                 image=self.image,
                 command=["python"],
@@ -68,6 +66,7 @@ class StepNode(Node):
                     ArgoParameter(name="ARGUS_DIR", value="/tmp"),
                 ],
                 envFrom=secrets,
+                imagePullPolicy=image_pull_policy,
             ),
             inputs={"parameters": [ArgoParameter(name="inputs")]},
             outputs={

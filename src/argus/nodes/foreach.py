@@ -22,7 +22,6 @@ ForeachTask = Callable[..., list[Any]]
 
 class Foreach(Node):
     task: ForeachTask | list[Any]
-    task_name: str = ""
     item_name: str = "item"
     image: str | None = None
     secrets: list[str] | None = None
@@ -33,12 +32,6 @@ class Foreach(Node):
         self, task: ForeachTask | list[Any], item_name: str = "item", **kwargs
     ):
         super().__init__(task=task, item_name=item_name, **kwargs)
-
-    def model_post_init(self, __context):
-        if callable(self.task):
-            self.task_name = self.task.__name__
-        else:
-            self.task_name = "foreach"
 
     def then(self, task: StepTask, **kwargs) -> Foreach:
         if self._prev != "foreach":
@@ -53,7 +46,7 @@ class Foreach(Node):
         if callable(self.task):
             data = loads(data_path.read_text())
             environ["ARGUS_DATA"] = dumps(data)
-            items = run_foreach(self.task_name, self.task.__module__)
+            items = run_foreach(self.task.__name__, self.task.__module__)
         elif isinstance(self.task, list):
             items = self.task
 
@@ -107,7 +100,7 @@ class Foreach(Node):
                 value=f"{{{{steps.step{step_counter - 1}.outputs.parameters.outputs}}}}",
             )
         ]
-        script_source = f'from {run_foreach.__module__} import run_foreach\nrun_foreach("{self.task_name}", "{self.task.__module__}")'
+        script_source = f'from {run_foreach.__module__} import run_foreach\nrun_foreach("{self.task.__name__}", "{self.task.__module__}")'
         step_name = f"step{step_counter}foreach"
 
         secrets = None
@@ -116,9 +109,9 @@ class Foreach(Node):
                 ArgoSecretRef(secretRef=ArgoParameter(name=secret))
                 for secret in self.secrets
             ]
-
+        image_pull_policy = "Always" if self.image else None
         template = ArgoScriptTemplate(
-            name=self.task_name,
+            name=step_name,
             script=ArgoScript(
                 image=self.image,
                 command=["python"],
@@ -130,6 +123,7 @@ class Foreach(Node):
                     ArgoParameter(name="ARGUS_DIR", value="/tmp"),
                 ],
                 envFrom=secrets,
+                imagePullPolicy=image_pull_policy,
             ),
             inputs={"parameters": [ArgoParameter(name="inputs")]},
             outputs={
@@ -144,7 +138,7 @@ class Foreach(Node):
         step = [
             ArgoStep(
                 name=step_name,
-                template=self.task_name,
+                template=step_name,
                 arguments={"parameters": parameters},
             )
         ]

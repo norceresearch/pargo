@@ -3,14 +3,14 @@ from json import dumps, loads
 import pytest
 
 from argus import Foreach
-from argus.utils import additem, addy, double, getitems, triple
+from argus.utils import add_item, add_y, double, get_items, triple
 
 
 def test_foreach_with_function(tmp_path):
     """Test that Foreach run as expected gived a function"""
     (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 2}))
 
-    node = Foreach(getitems).then(double)
+    node = Foreach(get_items).then(double)
     node.run()
 
     data_path = tmp_path / ".argus" / "data.json"
@@ -39,7 +39,7 @@ def test_foreach_with_item(tmp_path):
     """Test that Foreach runs as expected when using the items in the given list."""
     (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 5}))
 
-    node = Foreach([1, 2]).then(additem)
+    node = Foreach([1, 2]).then(add_item)
     node.run()
 
     data_path = tmp_path / ".argus" / "data.json"
@@ -53,7 +53,7 @@ def test_foreach_with_named_item(tmp_path):
     """Test that Foreach runs as expected when using named items in the given list."""
     (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 1}))
 
-    node = Foreach([2, 5], item_name="y").then(addy)
+    node = Foreach([2, 5], item_name="y").then(add_y)
     node.run()
 
     data_path = tmp_path / ".argus" / "data.json"
@@ -66,7 +66,7 @@ def test_foreach_with_named_item(tmp_path):
 
 def test_foreach_to_argo_function():
     """Test that Foreach.to_argo produces the expected structure given a function."""
-    node = Foreach(getitems).then(double)
+    node = Foreach(get_items).then(double)
     steps, templates = node.to_argo(2)
 
     assert isinstance(steps, list)
@@ -84,6 +84,6 @@ def test_foreach_to_argo_list():
 
 def test_foreach_then_twice_raises():
     """Test that wrong order fails."""
-    node = Foreach(getitems).then(double)
+    node = Foreach(get_items).then(double)
     with pytest.raises(RuntimeError, match="must follow Foreach"):
         node.then(triple)

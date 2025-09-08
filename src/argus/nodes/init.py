@@ -18,7 +18,6 @@ InitTask = dict[str, Any]
 
 class InitNode(Node):
     task: InitTask
-    task_name: str = "init"
 
     def run(self):
         for key, value in self.task.items():
@@ -31,7 +30,7 @@ class InitNode(Node):
         step_name = f"step{step_counter}{step_suffix}"
         step = ArgoStep(
             name=step_name,
-            template=self.task_name,
+            template=step_name,
         )
 
         env = [
@@ -42,7 +41,7 @@ class InitNode(Node):
         ]
         env.append(ArgoParameter(name="ARGUS_DIR", value="/tmp"))
         template = ArgoScriptTemplate(
-            name=self.task_name,
+            name=step_name,
             script=ArgoScript(
                 image=None,
                 command=["python"],

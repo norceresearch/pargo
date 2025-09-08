@@ -29,7 +29,7 @@ def test_initnode_to_argo():
 
     assert isinstance(templates, list)
     template = templates[0]
-    assert template.name == "init"
+    assert template.name == "step0"
     env_names = [e.name for e in template.script.env]
     for k in task_data.keys():
         assert f"ARGUS_PARAM_{k}" in env_names
