@@ -76,7 +76,7 @@ class ArgoSpec(BaseModel):
 
 class ArgoMetadata(BaseModel):
     name: str
-    namespace: str | None = None
+    namespace: str = "argo-workflows"
 
 
 class ArgoSensor(BaseModel):

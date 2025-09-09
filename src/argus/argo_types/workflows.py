@@ -16,6 +16,7 @@ class ArgoPodGC(BaseModel):
 class ArgoWorkflowMetadata(BaseModel):
     generateName: str | None = None
     name: str | None = None
+    namespace: str = "argo-workflows"
 
 
 class ArgoParameter(BaseModel):

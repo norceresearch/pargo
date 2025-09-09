@@ -115,7 +115,7 @@ class Sensor(BaseModel):
         sensor = ArgoSensor(
             apiVersion="argoproj.io/v1alpha1",
             kind="Sensor",
-            metadata=ArgoMetadata(name=self.name, namespace="argo-workflows"),
+            metadata=ArgoMetadata(name=self.name),
             spec=ArgoSpec(
                 eventBusName="argoevents",
                 template=ArgoTemplate(serviceAccountName="argo-service-account"),
