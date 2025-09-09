@@ -92,7 +92,7 @@ def test_workflow_schedule(tmp_path):
     testflow.to_yaml(path=tmp_path)
     assert yaml_path.exists()
     data = yaml_path.read_text()
-    assert "CronWorkflowTemplate" in data
+    assert "CronWorkflow" in data
     assert "testflow" in data
     if which("argo"):
         lint_yaml(tmp_path)

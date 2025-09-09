@@ -104,6 +104,6 @@ class ArgoWorkflow(BaseModel):
 
 class ArgoCronWorkflow(BaseModel):
     apiVersion: str = "argoproj.io/v1alpha1"
-    kind: str = "Workflow"
+    kind: str = "CronWorkflow"
     metadata: ArgoWorkflowMetadata
     spec: ArgoCronWorkflowSpec

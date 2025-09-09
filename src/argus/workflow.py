@@ -127,7 +127,6 @@ class Workflow(BaseModel):
     def to_yaml_cron(self, path):
         """Write manifest for scheduled execution on Argo Workflows."""
         wf = ArgoCronWorkflow(
-            kind="CronWorkflowTemplate",
             metadata=ArgoWorkflowMetadata(name=self.name),
             spec=ArgoCronWorkflowSpec(
                 schedules=self.schedules,
