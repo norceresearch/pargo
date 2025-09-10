@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from json import dumps
+from argparse import REMAINDER, ArgumentParser
+from json import JSONDecodeError, dumps, loads
 from pathlib import Path
+from sys import argv
 from typing import Any
 
 from loguru import logger
@@ -62,9 +64,16 @@ class Workflow(BaseModel):
         self._nodes.append(node)
         return self
 
-    def run(self):
+    def run(self, parameters: dict[str, Any] | None = None):
         """Run the workflow locally."""
         logger.info("Workflow started")
+
+        if parameters:  # Override default parameters
+            defaults = self._nodes[0].task
+            defaults.update(
+                (k, parameters[k]) for k in defaults.keys() & parameters.keys()
+            )
+
         for step in self._nodes:
             step.run()
         logger.info("Workflow ended")
@@ -139,6 +148,47 @@ class Workflow(BaseModel):
         Path(path / (self.name + "-cron.yaml")).write_text(
             safe_dump(yaml_str, sort_keys=False)
         )
+
+    def main(self, manifest_path: Path | None = None):
+        """Method to run workflow with commands from terminal."""
+        parser = ArgumentParser(description="Workflow runner")
+        subparsers = parser.add_subparsers(dest="command")
+
+        run_parser = subparsers.add_parser("run", help="Run the workflow locally")
+        run_parser.add_argument("--params", nargs=REMAINDER)
+
+        subparsers.add_parser("generate", help="Generate YAML manifest")
+
+        args = parser.parse_args()
+
+        if args.command == "run":
+            params = {}
+            if args.params:
+                it = iter(args.params)
+                for key in it:
+                    try:
+                        params[key] = self._parse_value(next(it))
+                    except StopIteration:
+                        raise ValueError(f"Missing value for {key}")
+            self.run(params)
+
+        elif args.command == "generate":
+            path = manifest_path or Path.cwd()
+            self.to_yaml(path)
+        else:
+            print(f"Argus workflow {self.name}")
+            print("Run locally:")
+            print(f"  python {argv[0]} run")
+            print(f"  python {argv[0]} run --params key value key2 value2")
+            print("Generate manifest:")
+            print(f"  python {argv[0]} generate")
+
+    @staticmethod
+    def _parse_value(val: str):
+        try:
+            return loads(val)
+        except JSONDecodeError:
+            return val
 
     @staticmethod
     def _remove_duplicated_templates(

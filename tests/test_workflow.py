@@ -1,4 +1,5 @@
 import subprocess
+import sys
 from json import dumps, loads
 from os import environ
 from pathlib import Path
@@ -210,3 +211,95 @@ def test_workflow_complex(tmp_path):
     assert (tmp_path / "testflow-cron.yaml").exists()
     if which("argo"):
         lint_yaml(tmp_path)
+
+
+def test_workfow_main(capsys):
+    """Test that main prints how to run workflow and generate manifest."""
+    testflow = Workflow.new(name="testflow")
+    testflow.main()
+    out = capsys.readouterr().out
+    assert "Argus workflow testflow" in out
+
+
+def test_workflow_main_run(monkeypatch):
+    """Test that the workflow runs with command run."""
+    testflow = Workflow.new(name="testflow", parameters={"x": 1}).next(double)
+
+    monkeypatch.setattr(sys, "argv", ["mock.py", "run"])
+
+    testflow.main()
+    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    result = loads(data_path.read_text())
+    assert result["x"] == 2
+
+
+def test_workflow_main_run_params(monkeypatch):
+    """Test that the workflow runs with default and override parameters."""
+    defaults = {
+        "int_param": 2,
+        "bool_param": False,
+        "float_param": 1.5,
+        "str_param": "parameter",
+        "json_param": dumps({"x": 1}),
+    }
+    testflow = Workflow.new(name="testflow", parameters=defaults)
+
+    monkeypatch.setattr(sys, "argv", ["wf.py", "run"])
+    testflow.main()
+    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    result = loads(data_path.read_text())
+    assert result["int_param"] == 2
+    assert result["bool_param"] is False
+    assert result["float_param"] == 1.5
+    assert result["str_param"] == "parameter"
+    assert result["json_param"] == dumps({"x": 1})
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "wf.py",
+            "run",
+            "--params",
+            "int_param",
+            "5",
+            "bool_param",
+            "true",
+            "float_param",
+            "2.5",
+            "str_param",
+            "other",
+            "json_param",
+            dumps(dumps({"x": 5})),
+        ],
+    )
+    testflow.main()
+    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    result = loads(data_path.read_text())
+    assert result["int_param"] == 5
+    assert result["bool_param"] is True
+    assert result["float_param"] == 2.5
+    assert result["str_param"] == "other"
+    assert result["json_param"] == dumps({"x": 5})
+
+
+def test_workflow_main_run_missing_value(monkeypatch):
+    """Test that the run fails if only key without value is provided"""
+    testflow = Workflow.new(name="testflow")
+    monkeypatch.setattr(sys, "argv", ["mock.py", "run", "--params", "foo"])
+    with pytest.raises(ValueError, match="Missing value"):
+        testflow.main()
+
+
+def test_workflow_main_generate(monkeypatch, tmp_path):
+    """Test that the manifest is generated with command generate."""
+    testflow = Workflow.new(name="testflow", parameters={"x": 1}).next(double)
+    monkeypatch.setattr(sys, "argv", ["mock.py", "generate"])
+
+    testflow.main(tmp_path)
+
+    out_file = tmp_path / "testflow.yaml"
+    assert out_file.exists()
+    content = out_file.read_text()
+    assert "kind: WorkflowTemplate" in content
+    assert "metadata" in content
