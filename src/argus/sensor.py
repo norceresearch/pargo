@@ -45,9 +45,9 @@ class Sensor(BaseModel):
                     filters=ArgoFilters(
                         data=[
                             ArgoFilterData(
-                                path="body.metadata.generateName",
+                                path="body.metadata.name",
                                 type="string",
-                                value=[f"{name}-"],
+                                value=[f"^{name}-.*"],
                             ),
                             ArgoFilterData(
                                 path="body.status.phase",
