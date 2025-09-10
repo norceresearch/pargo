@@ -4,7 +4,7 @@ from argparse import REMAINDER, ArgumentParser
 from json import JSONDecodeError, dumps, loads
 from pathlib import Path
 from sys import argv
-from typing import Any
+from typing import Any, Callable
 
 from loguru import logger
 from pydantic import BaseModel
@@ -57,7 +57,7 @@ class Workflow(BaseModel):
                     "trigger_on_parameters must be same length as number of OR statements when defined."
                 )
 
-    def next(self, node: Node, **kwargs) -> Workflow:
+    def next(self, node: Node | Callable, **kwargs) -> Workflow:
         """Add steps to the workflow"""
         if callable(node):
             node = StepNode(task=node, **kwargs)
