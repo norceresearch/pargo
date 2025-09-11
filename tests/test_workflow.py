@@ -68,6 +68,42 @@ def test_workflow_yaml_consistency(tmp_path):
     assert yamls[0] == yamls[1], "Indentical workflows give inconsistent yamls."
 
 
+def test_workflow_to_argo():
+    """Test that to_argo produce the expected structure"""
+    testflow = Workflow.new(
+        name="testflow",
+        parameters={
+            "x": 1,
+        },
+        image="image",
+        secrets=["minio-s3-credentials-secret", "mlflow-credentials-secret"],
+        schedules=["0 0 * * *"],
+        parallelism=3,
+    ).next(double, image="other-image", parallelism=5)
+    argo_testflow = testflow.to_argo()
+    assert argo_testflow.kind == "WorkflowTemplate"
+    assert argo_testflow.metadata.name == "testflow"
+    assert argo_testflow.spec.entrypoint == "main"
+    assert argo_testflow.spec.parallelism == 3
+    assert argo_testflow.spec.arguments["parameters"][0].name == "x"
+    assert argo_testflow.spec.templates[0].name == "main"
+    assert len(argo_testflow.spec.templates[0].steps) == 2
+
+    # init step
+    step0 = argo_testflow.spec.templates[1]
+    assert step0.name == "step0"
+    assert step0.script.image == "image"
+    assert step0.script.env[0].name == "ARGUS_PARAM_x"
+
+    # double step
+    step1 = argo_testflow.spec.templates[2]
+    assert step1.name == "step1"
+    assert step1.script.image == "other-image"
+    assert step1.script.env[0].name == "ARGUS_DATA"
+    assert step1.script.envFrom[0].secretRef.name == "minio-s3-credentials-secret"
+    assert step1.parallelism == 5
+
+
 def test_workflow_duplicate_templates():
     """Test that duplicated templates are allowed."""
 
@@ -191,7 +227,7 @@ def test_workflow_complex(tmp_path):
                 "param3": 3.0,
                 "param4": dumps({"c": 1, "d": 2}),
             },
-            image="registry.norce.dev/norce-analytics/mimir/workflows:latest",
+            image="image",
             secrets=["minio-s3-credentials-secret", "mlflow-credentials-secret"],
             schedules=["0 0 * * *"],
         )

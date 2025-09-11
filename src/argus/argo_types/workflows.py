@@ -47,6 +47,7 @@ class ArgoWorkflowSpec(BaseModel):
     templates: list[Any] = []
     ttlStrategy: ArgoTTLStrategy | None = None
     podGC: ArgoPodGC | None = None
+    parallelism: int | None = None
 
 
 class ArgoWorkflowTemplateRef(BaseModel):
@@ -93,6 +94,7 @@ class ArgoScriptTemplate(BaseModel, frozen=True):
     script: ArgoScript
     outputs: dict[str, list[ArgoParameter]] | None = None
     serviceAccountName: str = "argo-service-account"
+    parallelism: int | None = None
 
 
 class ArgoWorkflow(BaseModel):

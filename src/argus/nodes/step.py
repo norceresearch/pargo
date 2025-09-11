@@ -21,6 +21,7 @@ class StepNode(Node):
     task: StepTask
     image: str | None = None
     secrets: list[str] | None = None
+    parallelism: int | None = None
 
     def run(self, write_data: bool = True):
         data_path = argus_path() / "data.json"
@@ -74,6 +75,7 @@ class StepNode(Node):
                     ArgoParameter(name="outputs", valueFrom={"path": "/tmp/data.json"})
                 ]
             },
+            parallelism=self.parallelism,
         )
 
         return [[step]], [template]

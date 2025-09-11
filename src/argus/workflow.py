@@ -39,6 +39,7 @@ class Workflow(BaseModel):
     secrets: list[str] | None = None
     trigger_on: Workflow | Condition = None
     trigger_on_parameters: list[dict[str, Any]] | None = None
+    parallelism: int | None = None
     _nodes: list[Node] = []
 
     @classmethod
@@ -102,9 +103,9 @@ class Workflow(BaseModel):
                 ]
             },
             templates=templates,
-            schedules=self.schedules,
             ttlStrategy=ArgoTTLStrategy(),
             podGC=ArgoPodGC(),
+            parallelism=self.parallelism,
         )
 
         wf = ArgoWorkflow(
