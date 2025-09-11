@@ -42,6 +42,8 @@ class Workflow(BaseModel):
     parallelism: int | None = None
     _nodes: list[Node] = []
 
+    _annotations = __annotations__
+
     @classmethod
     def new(cls, name: str, **kwargs) -> Workflow:
         return cls(name=name, **kwargs)
@@ -115,8 +117,10 @@ class Workflow(BaseModel):
         )
         return wf
 
-    def to_yaml(self, path=""):
+    def to_yaml(self, path: Path | str = ""):
         """Write manifest(s) to run the workflow on Argo Workflows."""
+        if isinstance(path, str):
+            path = Path(path)
         wf = self.to_argo()
         yaml_str = wf.model_dump(exclude_none=True)
         Path(path / (self.name + ".yaml")).write_text(
@@ -241,6 +245,19 @@ class Workflow(BaseModel):
             return Condition(items=[self.name, other.name])
         else:
             return Condition(items=[self.name] + other.items)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}<name={self.name}>"
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __hash__(self):
+        return hash(
+            getattr(self, attr)
+            for attr in self._annotations
+            if not isinstance(getattr(self, attr), dict)
+        )
 
 
 # Rebuilding the pydantic model after Workflow is defined
