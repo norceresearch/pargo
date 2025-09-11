@@ -99,6 +99,7 @@ def run_init():
     data = {}
     for k in list(environ.keys()):
         if k.startswith("ARGUS_PARAM_"):
-            data[k.removeprefix("ARGUS_PARAM_")] = loads(environ.pop(k))
+            parameter = loads(environ.pop(k))
+            data[parameter["key"]] = loads(parameter["value"])
     data_path = argus_path() / "data.json"
     data_path.write_text(dumps(data))

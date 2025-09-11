@@ -20,8 +20,8 @@ class InitNode(Node):
     task: InitTask
 
     def run(self):
-        for key, value in self.task.items():
-            environ[f"ARGUS_PARAM_{key}"] = dumps(value)
+        for i, (key, value) in enumerate(self.task.items()):
+            environ[f"ARGUS_PARAM_{i}"] = dumps({"key": key, "value": dumps(value)})
         run_init()
 
     def to_argo(self, step_counter: int, step_suffix: str = ""):
@@ -35,9 +35,10 @@ class InitNode(Node):
 
         env = [
             ArgoParameter(
-                name=f"ARGUS_PARAM_{k}", value=f"{{{{workflow.parameters.{k}}}}}"
+                name=f"ARGUS_PARAM_{i}",
+                value=dumps({"key": k, "value": f"{{{{workflow.parameters.{k}}}}}"}),
             )
-            for k in self.task.keys()
+            for i, k in enumerate(self.task.keys())
         ]
         env.append(ArgoParameter(name="ARGUS_DIR", value="/tmp"))
         template = ArgoScriptTemplate(

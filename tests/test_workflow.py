@@ -93,7 +93,7 @@ def test_workflow_to_argo():
     step0 = argo_testflow.spec.templates[1]
     assert step0.name == "step0"
     assert step0.script.image == "image"
-    assert step0.script.env[0].name == "ARGUS_PARAM_x"
+    assert step0.script.env[0].name == "ARGUS_PARAM_0"
 
     # double step
     step1 = argo_testflow.spec.templates[2]
@@ -169,7 +169,7 @@ def test_workflow_trigger_on_multiple(tmp_path):
         lint_yaml(tmp_path)
 
 
-def test_workflow_trigger_on_multiple_error(tmp_path):
+def test_workflow_trigger_on_multiple_error():
     """Test that Workflow.to_yaml fails for incorrect triggering syntax."""
     testflow1 = Workflow.new("testflow1").next(double)
     testflow2 = Workflow.new("testflow2").next(double)
@@ -204,7 +204,7 @@ def test_workflow_trigger_on_params(tmp_path):
         lint_yaml(tmp_path)
 
 
-def test_workflow_trigger_on_params_error(tmp_path):
+def test_workflow_trigger_on_params_error():
     """Test that Workflow.to_yaml fails for incorrect number of parameters."""
     testflow1 = Workflow.new("testflow1").next(double)
     testflow2 = Workflow.new("testflow2").next(double)

@@ -5,7 +5,7 @@ from pathlib import Path
 from argus.nodes.init import InitNode
 
 
-def test_initnode_data(tmp_path):
+def test_initnode_data():
     """Test that InitNode insert parameters to data-file"""
     task_data = {"x": 42, "param2": "thanks for all the fish"}
     node = InitNode(task=task_data)
@@ -31,6 +31,6 @@ def test_initnode_to_argo():
     template = templates[0]
     assert template.name == "step0"
     env_names = [e.name for e in template.script.env]
-    for k in task_data.keys():
-        assert f"ARGUS_PARAM_{k}" in env_names
+    for i in range(len(task_data)):
+        assert f"ARGUS_PARAM_{i}" in env_names
     assert any("ARGUS_DIR" in e.name for e in template.script.env)
