@@ -34,7 +34,7 @@ class Condition(BaseModel):
         for item in self.items:
             for part in item.split(" && "):
                 seen.add(part)
-        return list(seen)
+        return sorted(list(seen))
 
     def __iter__(self):
         return iter(self.items)

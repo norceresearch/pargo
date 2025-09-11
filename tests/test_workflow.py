@@ -203,6 +203,15 @@ def test_workflow_trigger_on_params(tmp_path):
     if which("argo"):
         lint_yaml(tmp_path)
 
+    # Test consistency
+    yamls = []
+    for _ in range(3):
+        triggeredflow.to_yaml(path=tmp_path)
+        yamls.append((tmp_path / "triggeredflow-sensor.yaml").read_text())
+    assert yamls[0] == yamls[1] == yamls[2], (
+        "Indentical workflows give inconsistent yamls."
+    )
+
 
 def test_workflow_trigger_on_params_error():
     """Test that Workflow.to_yaml fails for incorrect number of parameters."""
