@@ -79,15 +79,23 @@ def test_workflow_to_argo():
         secrets=["minio-s3-credentials-secret", "mlflow-credentials-secret"],
         schedules=["0 0 * * *"],
         parallelism=3,
+        pod_metadata={"labels": {"foo": "bar"}, "annotations": {"fizz": "buzz"}},
     ).next(double, image="other-image", parallelism=5)
     argo_testflow = testflow.to_argo()
     assert argo_testflow.kind == "WorkflowTemplate"
     assert argo_testflow.metadata.name == "testflow"
     assert argo_testflow.spec.entrypoint == "main"
     assert argo_testflow.spec.parallelism == 3
+
+    assert argo_testflow.spec.arguments is not None
     assert argo_testflow.spec.arguments["parameters"][0].name == "x"
+
     assert argo_testflow.spec.templates[0].name == "main"
     assert len(argo_testflow.spec.templates[0].steps) == 2
+
+    assert argo_testflow.spec.podMetadata is not None
+    assert argo_testflow.spec.podMetadata["labels"] == {"foo": "bar"}
+    assert argo_testflow.spec.podMetadata["annotations"] == {"fizz": "buzz"}
 
     # init step
     step0 = argo_testflow.spec.templates[1]

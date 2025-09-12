@@ -23,6 +23,7 @@ from .argo_types.workflows import (
     ArgoWorkflowMetadata,
     ArgoWorkflowSpec,
     ArgoWorkflowTemplateRef,
+    PodMetadata,
 )
 from .nodes.init import InitNode
 from .nodes.node import Node
@@ -37,9 +38,10 @@ class Workflow(BaseModel):
     image: str = "python:3.11"
     schedules: list[str] | None = None
     secrets: list[str] | None = None
-    trigger_on: Workflow | Condition = None
+    trigger_on: Workflow | Condition | None = None
     trigger_on_parameters: list[dict[str, Any]] | None = None
     parallelism: int | None = None
+    pod_metadata: None | PodMetadata = None
     _nodes: list[Node] = []
 
     _annotations = __annotations__
@@ -108,6 +110,7 @@ class Workflow(BaseModel):
             ttlStrategy=ArgoTTLStrategy(),
             podGC=ArgoPodGC(),
             parallelism=self.parallelism,
+            podMetadata=self.pod_metadata,
         )
 
         wf = ArgoWorkflow(

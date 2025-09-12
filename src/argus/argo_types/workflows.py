@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, Field
+
+PodMetadata: TypeAlias = dict[Literal["annotations", "labels"], dict[str, str]]
 
 
 class ArgoTTLStrategy(BaseModel):
@@ -48,6 +50,7 @@ class ArgoWorkflowSpec(BaseModel):
     ttlStrategy: ArgoTTLStrategy | None = None
     podGC: ArgoPodGC | None = None
     parallelism: int | None = None
+    podMetadata: None | PodMetadata
 
 
 class ArgoWorkflowTemplateRef(BaseModel):
