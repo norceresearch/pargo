@@ -102,7 +102,13 @@ def test_run_foreach_task_with_invalid_return_type(tmp_path, task):
 
 def test_run_init(tmp_path):
     """Test that run_init produces the expected output."""
-    environ["ARGUS_PARAM_0"] = dumps({"key": "test", "value": dumps(42)})
+    environ["ARGUS_PARAM_0"] = dumps({"key": "test0", "value": 42})
+    environ["ARGUS_PARAM_1"] = dumps({"key": "test1", "value": 4.2})
+    environ["ARGUS_PARAM_2"] = dumps({"key": "test2", "value": "text"})
+    environ["ARGUS_PARAM_3"] = dumps({"key": "test3", "value": True})
     run_init()
     data = loads((tmp_path / ".argus" / "data.json").read_text())
-    assert data == {"test": 42}
+    assert data["test0"] == 42
+    assert data["test1"] == 4.2
+    assert data["test2"] == "text"
+    assert data["test3"] is True
