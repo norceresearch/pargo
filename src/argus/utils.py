@@ -1,3 +1,5 @@
+from typing import Any
+
 from loguru import logger
 
 
@@ -25,11 +27,15 @@ def get_items():
     return [1, 2, 3]
 
 
+def echo_item(item: Any):
+    logger.info(f"Item has value {item} an type {type(item).__name__}")
+
+
 def add_item(item: int, x: int):
-    logger.info(f"Adding {item} to x")
-    return {"x": item + x}
+    logger.info(f"Adding {item} to x, save as y")
+    return {"y": item + x}
 
 
 def add_y(x: int, y: int):
-    logger.info("Adding y to x")
-    return {"x": x + y, "y": y}
+    logger.info("Adding y to x, save as y")
+    return {"y": x + y}

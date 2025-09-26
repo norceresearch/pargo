@@ -44,9 +44,9 @@ def test_foreach_with_item(tmp_path):
 
     data_path = tmp_path / ".argus" / "data.json"
     result = loads(data_path.read_text())
-    assert "x" in result
-    assert isinstance(result["x"], list)
-    assert sorted(result["x"]) == [6, 7]
+    assert "y" in result
+    assert isinstance(result["y"], list)
+    assert sorted(result["y"]) == [6, 7]
 
 
 def test_foreach_with_named_item(tmp_path):
@@ -58,10 +58,10 @@ def test_foreach_with_named_item(tmp_path):
 
     data_path = tmp_path / ".argus" / "data.json"
     result = loads(data_path.read_text())
-    assert "x" in result
-    assert isinstance(result["x"], list)
-    assert sorted(result["x"]) == [3, 6]
-    assert sorted(result["y"]) == [2, 5]
+    assert "y" in result
+    assert isinstance(result["y"], list)
+    assert sorted(result["y"]) == [3, 6]
+    assert result["x"] == 1
 
 
 def test_foreach_to_argo_function():

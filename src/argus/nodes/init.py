@@ -21,7 +21,7 @@ class InitNode(Node):
 
     def run(self):
         for i, (key, value) in enumerate(self.task.items()):
-            environ[f"ARGUS_PARAM_{i}"] = dumps({"key": key, "value": value})
+            environ[f"ARGUS_PARAM_{i}"] = dumps({key: value})
         run_init()
 
     def to_argo(self, step_counter: int, step_suffix: str = ""):
@@ -36,7 +36,7 @@ class InitNode(Node):
         env = [
             ArgoParameter(
                 name=f"ARGUS_PARAM_{i}",
-                value=f'{{"key": "{k}", "value": {{{{workflow.parameters.{k}}}}}}}',
+                value=f'{{"{k}": {{{{workflow.parameters.{k}}}}}}}',
             )
             for i, k in enumerate(self.task.keys())
         ]

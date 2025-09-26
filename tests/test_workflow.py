@@ -256,7 +256,8 @@ def test_workflow_complex(tmp_path):
     testflow.run()
     data_path = Path(environ["ARGUS_DIR"]) / "data.json"
     result = loads(data_path.read_text())
-    assert sorted(result["x"]) == [13, 15, 17]
+    assert result["x"] == 12
+    assert sorted(result["y"]) == [13, 15, 17]
 
     testflow.to_yaml(path=tmp_path)
     assert (tmp_path / "testflow.yaml").exists()

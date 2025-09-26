@@ -15,11 +15,16 @@ def load_and_run(task_name: str, module_name: str):
     func = getattr(module, task_name)
 
     data = loads(environ.pop("ARGUS_DATA", "{}"))
-    item = loads(environ.pop("ARGUS_ITEM", "{}"))
+    item = load_item()
     sig = signature(func)
     inputs = {k: v for k, v in {**data, **item}.items() if k in sig.parameters}
     result = func(**inputs)
     return result, data
+
+
+def load_item():
+    item = loads(environ.pop("ARGUS_ITEM", "{}"))
+    return {k: loads(v) for k, v in item.items()}
 
 
 def argus_path():
@@ -74,6 +79,7 @@ def run_foreach(task_name: str, module_name: str):
         raise ValueError(
             f"Foreach `{task_name}` must return list, got {type(result).__name__}"
         )
+    result = [dumps(r) for r in result]
     foreach_path = argus_path() / "foreach.json"
     foreach_path.write_text(dumps(result))
     return result
@@ -99,8 +105,8 @@ def run_init():
     data = {}
     for k in list(environ.keys()):
         if k.startswith("ARGUS_PARAM_"):
-            logger.info(environ.get(k))
             parameter = loads(environ.pop(k))
-            data[parameter["key"]] = parameter["value"]
+            data.update(parameter)
+    logger.info(f"Saving data: {dumps(data)}")
     data_path = argus_path() / "data.json"
     data_path.write_text(dumps(data))

@@ -53,7 +53,7 @@ class Foreach(Node):
         results = []
         for i, item in enumerate(items):
             logger.info(f"Processing item {i}: {item}")
-            environ["ARGUS_ITEM"] = dumps({self.item_name: item})
+            environ["ARGUS_ITEM"] = dumps({self.item_name: dumps(item)})
             result = self._then.run(write_data=False)
             results.append(result)
         data_path.write_text(dumps(results))
@@ -71,18 +71,28 @@ class Foreach(Node):
             steps.append(step)
             templates.append(template)
 
-            with_items = (
+            with_param = (
                 f"{{{{steps.step{step_counter}foreach.outputs.parameters.outputs}}}}"
             )
-            step, template = self._then.to_argo(step_counter, "then")
-            step = step[0][0]  # unpack
-            step.withParam = with_items
 
         if isinstance(self.task, list):
-            with_items = self.task
-            step, template = self._then.to_argo(step_counter, "then")
-            step = step[0][0]  # unpack
-            step.withItems = with_items
+            with_param = dumps([dumps(task) for task in self.task])
+
+        step, template = self._then.to_argo(step_counter, "then")
+        step = step[0][0]  # unpack
+        step.withParam = with_param
+
+        # Fix item as env stuff
+        step.arguments["parameters"].append(
+            ArgoParameter(name="item", value="{{item}}")
+        )
+        template[0].script.env.append(
+            ArgoParameter(
+                name="ARGUS_ITEM",
+                value=f'{{"{self.item_name}": "{{{{inputs.parameters.item}}}}"}}',
+            )
+        )
+        template[0].inputs["parameters"].append(ArgoParameter(name="item"))
 
         templates.extend(template)
         steps.append([step])
