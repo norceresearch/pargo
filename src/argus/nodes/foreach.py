@@ -29,7 +29,10 @@ class Foreach(Node):
     _prev: str = "foreach"
 
     def __init__(
-        self, task: ForeachTask | list[Any], item_name: str = "item", **kwargs
+        self,
+        task: ForeachTask | Callable | list[Any],
+        item_name: str = "item",
+        **kwargs,
     ):
         super().__init__(task=task, item_name=item_name, **kwargs)
 
