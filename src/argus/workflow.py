@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from json import dumps
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal
 
 from loguru import logger
 from pydantic import BaseModel
@@ -13,8 +14,7 @@ from .argo_types.workflows import (
     ArgoCronWorkflowSpec,
     ArgoParameter,
     ArgoPodGC,
-    ArgoScriptTemplate,
-    ArgoSecretRef,
+    ArgoStep,
     ArgoStepsTemplate,
     ArgoTTLStrategy,
     ArgoWorkflow,
@@ -23,8 +23,8 @@ from .argo_types.workflows import (
     ArgoWorkflowTemplateRef,
     PodMetadata,
 )
-from .nodes.init import InitNode
 from .nodes.node import Node
+from .nodes.run import argus_path
 from .nodes.step import StepNode
 from .sensor import Sensor
 from .trigger_condition import Condition
@@ -34,6 +34,7 @@ class Workflow(BaseModel):
     name: str
     parameters: dict[str, Any] = {}
     image: str = "python:3.11"
+    image_pull_policy: Literal["Always", "IfNotPresent", "Never", None] = "Always"
     schedules: list[str] | None = None
     secrets: list[str] | None = None
     trigger_on: Workflow | Condition | None = None
@@ -49,8 +50,6 @@ class Workflow(BaseModel):
         return cls(name=name, **kwargs)
 
     def model_post_init(self, __context):
-        self._nodes.append(InitNode(task=self.parameters))
-
         if isinstance(self.trigger_on, Workflow):
             self.trigger_on = Condition(items=[self.trigger_on.name])
 
@@ -71,11 +70,13 @@ class Workflow(BaseModel):
         """Run the workflow locally."""
         logger.info(f"Workflow {self.name} started")
 
+        defaults = deepcopy(self.parameters)
         if parameters:  # Override default parameters
-            defaults = self._nodes[0].task
             defaults.update(
                 (k, parameters[k]) for k in defaults.keys() & parameters.keys()
             )
+        data_path = argus_path() / "data.json"
+        data_path.write_text(dumps(defaults))
 
         for step in self._nodes:
             step.run()
@@ -83,18 +84,25 @@ class Workflow(BaseModel):
 
     def to_argo(self):
         """Generate a pydantic model of the workflow."""
-        steps = []
+        steps = ArgoStepsTemplate(name="main", steps=[])
+        arguments = None
         templates = []
         for ind, node in enumerate(self._nodes):
-            s, t = node.to_argo(ind)
-            steps.extend(s)
+            t = node.get_templates(
+                step_counter=ind,
+                default_image=self.image,
+                image_pull_policy=self.image_pull_policy,
+                default_secrets=self.secrets,
+                default_parameters=self.parameters,
+            )
+            s = ArgoStep(
+                name=f"step-{ind}-{node.argo_name}",
+                template=f"step-{ind}-{node.argo_name}",
+                arguments=arguments,
+            )
+            steps.steps.append([s])
             templates.extend(t)
-
-        templates = self._remove_duplicated_templates(templates)
-        self._add_default_image(templates)
-        self._add_default_secrets(templates)
-
-        templates = [ArgoStepsTemplate(name="main", steps=steps)] + templates
+            arguments = self.next_argument(ind, node.argo_name)
 
         spec = ArgoWorkflowSpec(
             entrypoint="main",
@@ -104,7 +112,7 @@ class Workflow(BaseModel):
                     for k, v in self.parameters.items()
                 ]
             },
-            templates=templates,
+            templates=[steps] + templates,
             ttlStrategy=ArgoTTLStrategy(),
             podGC=ArgoPodGC(),
             parallelism=self.parallelism,
@@ -156,37 +164,14 @@ class Workflow(BaseModel):
         )
 
     @staticmethod
-    def _remove_duplicated_templates(
-        templates: list[ArgoScriptTemplate],
-    ) -> list[ArgoScriptTemplate]:
-        """Removes duplicated templates (Tasks that are given more than once)."""
-        templates = [
-            template
-            for n, template in enumerate(templates)
-            if template not in templates[:n]
-        ]
-        template_names = [template.name for template in templates]
-        if len(template_names) > len(set(template_names)):
-            raise RuntimeError(
-                "Duplicate task detected: The same task is provided with different kwargs (image, secrets etc)."
+    def next_argument(ind: int, name: str):
+        parameters = [
+            ArgoParameter(
+                name="inputs",
+                value=f"{{{{steps.step-{ind}-{name}.outputs.parameters.outputs}}}}",
             )
-        return templates
-
-    def _add_default_image(self, templates: list[ArgoScriptTemplate]):
-        """Adds default image to steps with no explicit image."""
-        for template in templates:
-            template.script.image = template.script.image or self.image
-
-    def _add_default_secrets(self, templates: list[ArgoScriptTemplate]):
-        """Adds default secrets to steps with no explicit secrets."""
-        secrets = None
-        if self.secrets:
-            secrets = [
-                ArgoSecretRef(secretRef=ArgoParameter(name=secret))
-                for secret in self.secrets
-            ]
-        for template in templates:
-            template.script.envFrom = template.script.envFrom or secrets
+        ]
+        return {"parameters": parameters}
 
     def __and__(self, other):
         if isinstance(other, Workflow):

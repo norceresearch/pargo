@@ -30,13 +30,21 @@ def test_when_branch_otherwise(tmp_path):
     assert result["x"] == 12
 
 
-def test_when_to_argo():
+def test_when_get_templates():
     """Test that When.to_argo prodeces expected structure."""
     node = When(choice).then(double).otherwise(triple)
-    steps, templates = node.to_argo(1)
+    templates = node.get_templates(
+        step_counter=1,
+        default_image="image",
+        image_pull_policy="Always",
+        default_secrets=None,
+        default_parameters=[],
+    )
 
-    assert isinstance(steps, list)
-    assert any("whenmerge" in t.name for t in templates)
+    assert templates[0].name == "step-1-when"
+    assert templates[1].name == "step-1-when-choice"
+    assert templates[2].name == "step-1-when-then-double"
+    assert templates[3].name == "step-1-when-otherwise-triple"
 
 
 def test_when_otherwise_without_then_raises():

@@ -69,17 +69,21 @@ def test_workflow_yaml_consistency(tmp_path):
 
 def test_workflow_to_argo():
     """Test that to_argo produce the expected structure"""
-    testflow = Workflow.new(
-        name="testflow",
-        parameters={
-            "x": 1,
-        },
-        image="image",
-        secrets=["minio-s3-credentials-secret", "mlflow-credentials-secret"],
-        schedules=["0 0 * * *"],
-        parallelism=3,
-        pod_metadata={"labels": {"foo": "bar"}, "annotations": {"fizz": "buzz"}},
-    ).next(double, image="other-image", parallelism=5)
+    testflow = (
+        Workflow.new(
+            name="testflow",
+            parameters={
+                "x": 1,
+            },
+            image="image",
+            secrets=["minio-s3-credentials-secret", "mlflow-credentials-secret"],
+            schedules=["0 0 * * *"],
+            parallelism=3,
+            pod_metadata={"labels": {"foo": "bar"}, "annotations": {"fizz": "buzz"}},
+        )
+        .next(triple)
+        .next(double, image="other-image", parallelism=5)
+    )
     argo_testflow = testflow.to_argo()
     assert argo_testflow.kind == "WorkflowTemplate"
     assert argo_testflow.metadata.name == "testflow"
@@ -96,15 +100,16 @@ def test_workflow_to_argo():
     assert argo_testflow.spec.podMetadata["labels"] == {"foo": "bar"}
     assert argo_testflow.spec.podMetadata["annotations"] == {"fizz": "buzz"}
 
-    # init step
-    step0 = argo_testflow.spec.templates[1]
-    assert step0.name == "step0"
-    assert step0.script.image == "image"
-    assert step0.script.env[0].name == "ARGUS_PARAM_0"
+    # triple step
+    step1 = argo_testflow.spec.templates[1]
+    assert step1.name == "step-0-triple"
+    assert step1.script.image == "image"
+    assert step1.script.env[0].name == "ARGUS_DATA"
+    assert step1.script.envFrom[0].secretRef.name == "minio-s3-credentials-secret"
 
     # double step
     step1 = argo_testflow.spec.templates[2]
-    assert step1.name == "step1"
+    assert step1.name == "step-1-double"
     assert step1.script.image == "other-image"
     assert step1.script.env[0].name == "ARGUS_DATA"
     assert step1.script.envFrom[0].secretRef.name == "minio-s3-credentials-secret"
@@ -118,9 +123,9 @@ def test_workflow_duplicate_templates():
     argo_testflow = (
         testflow.next(double).next(double).next(double, image="OTHER_IMAGE").to_argo()
     )
-    assert argo_testflow.spec.templates[2].name == "step1"
-    assert argo_testflow.spec.templates[3].name == "step2"
-    assert argo_testflow.spec.templates[4].name == "step3"
+    assert argo_testflow.spec.templates[1].name == "step-0-double"
+    assert argo_testflow.spec.templates[2].name == "step-1-double"
+    assert argo_testflow.spec.templates[3].name == "step-2-double"
 
     testflow.run()
     data_path = Path(environ["ARGUS_DIR"]) / "data.json"

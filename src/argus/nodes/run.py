@@ -60,18 +60,6 @@ def run_when(task_name: str, module_name: str):
     return result
 
 
-def merge_when():
-    from json import dumps, loads
-    from os import environ
-
-    if environ["ARGUS_OTHER"].startswith("{{"):
-        data = loads(environ.pop("ARGUS_THEN"))
-    else:
-        data = loads(environ.pop("ARGUS_OTHER"))
-    data_path = argus_path() / "data.json"
-    data_path.write_text(dumps(data))
-
-
 def run_foreach(task_name: str, module_name: str):
     result, _ = load_and_run(task_name, module_name)
 
@@ -99,14 +87,3 @@ def merge_foreach():
 
     data_path = argus_path() / "data.json"
     data_path.write_text(dumps(merged))
-
-
-def run_init():
-    data = {}
-    for k in list(environ.keys()):
-        if k.startswith("ARGUS_PARAM_"):
-            parameter = loads(environ.pop(k))
-            data.update(parameter)
-    logger.info(f"Saving data: {dumps(data)}")
-    data_path = argus_path() / "data.json"
-    data_path.write_text(dumps(data))

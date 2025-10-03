@@ -2,18 +2,17 @@ from __future__ import annotations
 
 from json import dumps, loads
 from os import environ
-from typing import Callable
+from typing import Any, Callable
 
 from ..argo_types.workflows import (
     ArgoParameter,
-    ArgoScript,
-    ArgoScriptTemplate,
-    ArgoSecretRef,
     ArgoStep,
+    ArgoStepsTemplate,
 )
 from .node import Node
-from .run import argus_path, merge_when, run_when
+from .run import argus_path, run_when
 from .step import StepNode, StepTask
+from .worker_template import worker_template
 
 WhenTask = Callable[..., bool]
 
@@ -28,6 +27,10 @@ class When(Node):
 
     def __init__(self, task: WhenTask, **kwargs):
         super().__init__(task=task, **kwargs)
+
+    @property
+    def argo_name(self):
+        return "when"
 
     def then(self, task: StepTask, **kwargs) -> When:
         if self._prev != "when":
@@ -53,132 +56,112 @@ class When(Node):
         if result is False:
             self._otherwise.run()
 
-    def to_argo(self, step_counter: int):
-        when_step, when_templates = self.to_argo_when(step_counter=step_counter)
-        then_step, then_templates = self.to_argo_then(step_counter=step_counter)
-        otherwise_step, otherwise_templates = self.to_argo_otherwise(
-            step_counter=step_counter
-        )
-        merge_step, merge_templates = self.to_argo_merge(step_counter=step_counter)
+    def get_templates(
+        self,
+        step_counter: int,
+        default_image: str,
+        image_pull_policy: str,
+        default_secrets: list[str] | None,
+        default_parameters: dict[str, Any],
+    ):
+        block_name = f"step-{step_counter}-{self.argo_name}"
+        when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
+        then_name = block_name + "-then-" + self._then.argo_name
+        otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
 
-        steps = [[when_step], [then_step, otherwise_step], [merge_step]]
-        templates = (
-            when_templates + then_templates + otherwise_templates + merge_templates
-        )
-        return steps, templates
+        templates = [self.get_steps(block_name, default_parameters)]
 
-    def to_argo_when(self, step_counter: int):
+        # when template
         script_source = f'from {run_when.__module__} import run_when\nrun_when("{self.task.__name__}", "{self.task.__module__}")'
+        template = worker_template(
+            template_name=when_name,
+            script_source=script_source,
+            parameters=default_parameters,
+            image=self.image or default_image,
+            image_pull_policy=image_pull_policy,
+            secrets=self.secrets or default_secrets,
+            parallelism=None,
+            outpath="/tmp/when.json",
+        )
+        templates.append(template)
 
-        step_name = f"step{step_counter}when"
+        template = self._then.get_templates(
+            step_counter=step_counter,
+            default_image=default_image,
+            image_pull_policy=image_pull_policy,
+            default_secrets=default_secrets,
+            default_parameters=default_parameters,
+        )
+        template[0].name = then_name
+        templates.extend(template)
+
+        template = self._otherwise.get_templates(
+            step_counter=step_counter,
+            default_image=default_image,
+            image_pull_policy=image_pull_policy,
+            default_secrets=default_secrets,
+            default_parameters=default_parameters,
+        )
+        template[0].name = otherwise_name
+        templates.extend(template)
+
+        return templates
+
+    def get_steps(self, block_name: str, default_parameters: dict[str, Any]):
+        when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
+        then_name = block_name + "-then-" + self._then.argo_name
+        otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
+        default = ",".join(
+            f'"{k}": {{{{workflow.parameters.{k}}}}}' for k in default_parameters
+        )
+        default = f"{{{default}}}"
+
+        expression = f'steps["{when_name}"].outputs.parameters.outputs == "true" ? steps["{then_name}"].outputs.parameters.outputs : steps["{otherwise_name}"].outputs.parameters.outputs'
+        steps = ArgoStepsTemplate(
+            name=block_name,
+            inputs={"parameters": [ArgoParameter(name="inputs", default=default)]},
+            steps=[],
+            outputs={
+                "parameters": [
+                    ArgoParameter(
+                        name="outputs",
+                        valueFrom={"expression": expression},
+                    ),
+                ]
+            },
+        )
+
         parameters = [
             ArgoParameter(
                 name="inputs",
-                value=f"{{{{steps.step{step_counter - 1}.outputs.parameters.outputs}}}}",
+                value="{{inputs.parameters.inputs}}",
             )
         ]
-        secrets = None
-        if self.secrets:
-            secrets = [
-                ArgoSecretRef(secretRef=ArgoParameter(name=secret))
-                for secret in self.secrets
-            ]
-        image_pull_policy = "Always" if self.image else None
-        templates = [
-            ArgoScriptTemplate(
-                name=step_name,
-                script=ArgoScript(
-                    image=self.image,
-                    command=["python"],
-                    source=script_source,
-                    env=[
-                        ArgoParameter(
-                            name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"
-                        ),
-                        ArgoParameter(name="ARGUS_DIR", value="/tmp"),
-                    ],
-                    envFrom=secrets,
-                    imagePullPolicy=image_pull_policy,
-                ),
-                inputs={"parameters": [ArgoParameter(name="inputs")]},
-                outputs={
-                    "parameters": [
-                        ArgoParameter(
-                            name="outputs", valueFrom={"path": "/tmp/when.json"}
-                        )
-                    ]
-                },
-            )
-        ]
-        when_step = ArgoStep(
-            name=step_name,
-            template=step_name,
-            arguments={"parameters": parameters},
-        )
-        return when_step, templates
 
-    def to_argo_then(self, step_counter: int):
-        step, templates = self._then.to_argo(step_counter, "then")
-        step = step[0][0]  # unpack
-        step.when = (
-            f"{{{{steps.step{step_counter}when.outputs.parameters.outputs}}}} == true"
-        )
-        return step, templates
-
-    def to_argo_otherwise(self, step_counter: int):
-        step, templates = self._otherwise.to_argo(step_counter, "otherwise")
-        step = step[0][0]  # unpack
-        step.when = (
-            f"{{{{steps.step{step_counter}when.outputs.parameters.outputs}}}} == false"
-        )
-        return step, templates
-
-    def to_argo_merge(self, step_counter: int):
-        parameters = [
-            ArgoParameter(
-                name="then_output",
-                value=f"{{{{steps.step{step_counter}then.outputs.parameters.outputs}}}}",
-            ),
-            ArgoParameter(
-                name="otherwise_output",
-                value=f"{{{{steps.step{step_counter}otherwise.outputs.parameters.outputs}}}}",
-            ),
-        ]
-        env = [
-            ArgoParameter(name="ARGUS_THEN", value="{{inputs.parameters.then_output}}"),
-            ArgoParameter(
-                name="ARGUS_OTHER", value="{{inputs.parameters.otherwise_output}}"
-            ),
-            ArgoParameter(name="ARGUS_DIR", value="/tmp"),
-        ]
-        source = f"from {merge_when.__module__} import merge_when\nmerge_when()"
-        templates = [
-            (
-                ArgoScriptTemplate(
-                    name="whenmerge",
-                    script=ArgoScript(
-                        image=None, command=["python"], source=source, env=env
-                    ),
-                    inputs={
-                        "parameters": [
-                            ArgoParameter(name="then_output", default=""),
-                            ArgoParameter(name="otherwise_output", default=""),
-                        ]
-                    },
-                    outputs={
-                        "parameters": [
-                            ArgoParameter(
-                                name="outputs", valueFrom={"path": "/tmp/data.json"}
-                            )
-                        ]
-                    },
+        steps.steps.append(
+            [
+                ArgoStep(
+                    name=when_name,
+                    template=when_name,
+                    arguments={"parameters": parameters},
                 )
-            )
-        ]
-
-        merge_step = ArgoStep(
-            name=f"step{step_counter}",
-            template="whenmerge",
-            arguments={"parameters": parameters},
+            ]
         )
-        return merge_step, templates
+
+        steps.steps.append(
+            [
+                ArgoStep(
+                    name=then_name,
+                    template=then_name,
+                    when=f"{{{{steps.{when_name}.outputs.parameters.outputs}}}} == true",
+                    arguments={"parameters": parameters},
+                ),
+                ArgoStep(
+                    name=otherwise_name,
+                    template=otherwise_name,
+                    when=f"{{{{steps.{when_name}.outputs.parameters.outputs}}}} == false",
+                    arguments={"parameters": parameters},
+                ),
+            ]
+        )
+        return steps

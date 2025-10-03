@@ -8,14 +8,13 @@ from loguru import logger
 
 from ..argo_types.workflows import (
     ArgoParameter,
-    ArgoScript,
-    ArgoScriptTemplate,
-    ArgoSecretRef,
     ArgoStep,
+    ArgoStepsTemplate,
 )
 from .node import Node
 from .run import argus_path, merge_foreach, run_foreach
 from .step import StepNode, StepTask
+from .worker_template import worker_template
 
 ForeachTask = Callable[..., list[Any]]
 
@@ -35,6 +34,10 @@ class Foreach(Node):
         **kwargs,
     ):
         super().__init__(task=task, item_name=item_name, **kwargs)
+
+    @property
+    def argo_name(self):
+        return "foreach"
 
     def then(self, task: StepTask, **kwargs) -> Foreach:
         if self._prev != "foreach":
@@ -66,29 +69,45 @@ class Foreach(Node):
 
         logger.info("Foreach loop finished")
 
-    def to_argo(self, step_counter: int):
-        steps = []
-        templates = []
+    def get_templates(
+        self,
+        step_counter: int,
+        default_image: str,
+        image_pull_policy: str,
+        default_secrets: list[str] | None,
+        default_parameters: dict[str, Any],
+    ):
+        block_name = f"step-{step_counter}-{self.argo_name}"
+        then_name = block_name + "-" + self._then.argo_name
+        merge_name = block_name + "-merge"
+
+        templates = [self.get_steps(block_name, default_parameters)]
+
         if callable(self.task):
-            step, template = self.to_argo_foreach(step_counter)
-            steps.append(step)
+            foreach_name = (
+                block_name + "-" + self.task.__name__.lower().replace("_", "-")
+            )
+            script_source = f'from {run_foreach.__module__} import run_foreach\nrun_foreach("{self.task.__name__}", "{self.task.__module__}")'
+            template = worker_template(
+                template_name=foreach_name,
+                script_source=script_source,
+                parameters=default_parameters,
+                image=self.image or default_image,
+                image_pull_policy=image_pull_policy,
+                secrets=self.secrets or default_secrets,
+                parallelism=None,
+                outpath="/tmp/foreach.json",
+            )
             templates.append(template)
 
-            with_param = (
-                f"{{{{steps.step{step_counter}foreach.outputs.parameters.outputs}}}}"
-            )
-
-        if isinstance(self.task, list):
-            with_param = dumps([dumps(task) for task in self.task])
-
-        step, template = self._then.to_argo(step_counter, "then")
-        step = step[0][0]  # unpack
-        step.withParam = with_param
-
-        # Fix item as env stuff
-        step.arguments["parameters"].append(
-            ArgoParameter(name="item", value="{{item}}")
+        template = self._then.get_templates(
+            step_counter=step_counter,
+            default_image=default_image,
+            image_pull_policy=image_pull_policy,
+            default_secrets=default_secrets,
+            default_parameters=default_parameters,
         )
+        template[0].name = then_name
         template[0].script.env.append(
             ArgoParameter(
                 name="ARGUS_ITEM",
@@ -96,96 +115,106 @@ class Foreach(Node):
             )
         )
         template[0].inputs["parameters"].append(ArgoParameter(name="item"))
-
         templates.extend(template)
-        steps.append([step])
 
-        step, template = self.to_argo_merge(step_counter)
-        steps.append(step)
-        templates.append(template)
-
-        return steps, templates
-
-    def to_argo_foreach(self, step_counter: int):
-        parameters = [
-            ArgoParameter(
-                name="inputs",
-                value=f"{{{{steps.step{step_counter - 1}.outputs.parameters.outputs}}}}",
-            )
-        ]
-        script_source = f'from {run_foreach.__module__} import run_foreach\nrun_foreach("{self.task.__name__}", "{self.task.__module__}")'
-        step_name = f"step{step_counter}foreach"
-
-        secrets = None
-        if self.secrets:
-            secrets = [
-                ArgoSecretRef(secretRef=ArgoParameter(name=secret))
-                for secret in self.secrets
-            ]
-        image_pull_policy = "Always" if self.image else None
-        template = ArgoScriptTemplate(
-            name=step_name,
-            script=ArgoScript(
-                image=self.image,
-                command=["python"],
-                source=script_source,
-                env=[
-                    ArgoParameter(
-                        name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"
-                    ),
-                    ArgoParameter(name="ARGUS_DIR", value="/tmp"),
-                ],
-                envFrom=secrets,
-                imagePullPolicy=image_pull_policy,
-            ),
-            inputs={"parameters": [ArgoParameter(name="inputs")]},
-            outputs={
-                "parameters": [
-                    ArgoParameter(
-                        name="outputs", valueFrom={"path": "/tmp/foreach.json"}
-                    )
-                ]
-            },
-        )
-
-        step = [
-            ArgoStep(
-                name=step_name,
-                template=step_name,
-                arguments={"parameters": parameters},
-            )
-        ]
-        return step, template
-
-    def to_argo_merge(self, step_counter: int):
-        parameters = [
-            ArgoParameter(
-                name="inputs",
-                value=f"{{{{steps.step{step_counter}then.outputs.parameters.outputs}}}}",
-            )
-        ]
-        env = [ArgoParameter(name="ARGUS_DATA", value="{{inputs.parameters.inputs}}")]
-        env.append(ArgoParameter(name="ARGUS_DIR", value="/tmp"))
         script_source = (
             f"from {merge_foreach.__module__} import merge_foreach\nmerge_foreach()"
         )
-        template = ArgoScriptTemplate(
-            name="foreachmerge",
-            inputs={"parameters": [ArgoParameter(name="inputs")]},
-            script=ArgoScript(
-                image=self.image, command=["python"], source=script_source, env=env
-            ),
+        template = worker_template(
+            template_name=merge_name,
+            script_source=script_source,
+            parameters=default_parameters,
+            image=default_image,
+            image_pull_policy=image_pull_policy,
+            secrets=self.secrets or default_secrets,
+            parallelism=None,
+            outpath="/tmp/data.json",
+        )
+        templates.append(template)
+
+        return templates
+
+    def get_steps(self, block_name: str, default_parameters: dict[str, Any]):
+        then_name = block_name + "-" + self._then.argo_name
+        merge_name = block_name + "-merge"
+        default = ",".join(
+            f'"{k}": {{{{workflow.parameters.{k}}}}}' for k in default_parameters
+        )
+        default = f"{{{default}}}"
+
+        steps = ArgoStepsTemplate(
+            name=block_name,
+            inputs={"parameters": [ArgoParameter(name="inputs", default=default)]},
+            steps=[],
             outputs={
                 "parameters": [
-                    ArgoParameter(name="outputs", valueFrom={"path": "/tmp/data.json"})
+                    ArgoParameter(
+                        name="outputs",
+                        valueFrom={
+                            "parameter": f"{{{{steps.{merge_name}.outputs.parameters.outputs}}}}"
+                        },
+                    ),
                 ]
             },
         )
-        step = [
-            ArgoStep(
-                name=f"step{step_counter}",
-                template="foreachmerge",
-                arguments={"parameters": parameters},
+
+        if callable(self.task):
+            foreach_name = (
+                block_name + "-" + self.task.__name__.lower().replace("_", "-")
+            )
+            parameters = [
+                ArgoParameter(
+                    name="inputs",
+                    value="{{inputs.parameters.inputs}}",
+                )
+            ]
+            steps.steps.append(
+                [
+                    ArgoStep(
+                        name=foreach_name,
+                        template=foreach_name,
+                        arguments={"parameters": parameters},
+                    )
+                ]
+            )
+            with_param = f"{{{{steps.{foreach_name}.outputs.parameters.outputs}}}}"
+        elif isinstance(self.task, list):
+            with_param = dumps([dumps(task) for task in self.task])
+
+        parameters = [
+            ArgoParameter(
+                name="inputs",
+                value="{{inputs.parameters.inputs}}",
+            ),
+            ArgoParameter(
+                name="item",
+                value="{{item}}",
+            ),
+        ]
+        steps.steps.append(
+            [
+                ArgoStep(
+                    name=then_name,
+                    template=then_name,
+                    arguments={"parameters": parameters},
+                    withParam=with_param,
+                )
+            ]
+        )
+
+        parameters = [
+            ArgoParameter(
+                name="inputs",
+                value=f"{{{{steps.{then_name}.outputs.parameters.outputs}}}}",
             )
         ]
-        return step, template
+        steps.steps.append(
+            [
+                ArgoStep(
+                    name=merge_name,
+                    template=merge_name,
+                    arguments={"parameters": parameters},
+                )
+            ]
+        )
+        return steps

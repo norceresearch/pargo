@@ -78,7 +78,9 @@ class ArgoStep(BaseModel):
 
 class ArgoStepsTemplate(BaseModel):
     name: str
+    inputs: dict[str, list[ArgoParameter]] | None = None
     steps: list[list[ArgoStep]]
+    outputs: dict[str, list[ArgoParameter]] | None = None
 
 
 class ArgoScript(BaseModel):
@@ -91,7 +93,7 @@ class ArgoScript(BaseModel):
     imagePullPolicy: str | None = None
 
 
-class ArgoScriptTemplate(BaseModel, frozen=True):
+class ArgoScriptTemplate(BaseModel):
     name: str
     inputs: dict[str, list[ArgoParameter]] | None = None
     script: ArgoScript

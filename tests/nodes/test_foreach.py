@@ -64,22 +64,37 @@ def test_foreach_with_named_item(tmp_path):
     assert result["x"] == 1
 
 
-def test_foreach_to_argo_function():
-    """Test that Foreach.to_argo produces the expected structure given a function."""
+def test_foreach_get_templates_function():
+    """Test that Foreach.get_templates produces the expected structure given a function."""
     node = Foreach(get_items).then(double)
-    steps, templates = node.to_argo(2)
+    templates = node.get_templates(
+        step_counter=1,
+        default_image="image",
+        image_pull_policy="Always",
+        default_secrets=None,
+        default_parameters=[],
+    )
 
-    assert isinstance(steps, list)
-    assert any("foreachmerge" in t.name for t in templates)
+    assert templates[0].name == "step-1-foreach"
+    assert templates[1].name == "step-1-foreach-get-items"
+    assert templates[2].name == "step-1-foreach-double"
+    assert templates[3].name == "step-1-foreach-merge"
 
 
-def test_foreach_to_argo_list():
-    """Test that Foreach.to_argo produces the expected structure given a list."""
+def test_foreach_get_templates_list():
+    """Test that Foreach.get_templates produces the expected structure given a list."""
     node = Foreach(["a", "b"]).then(double)
-    steps, templates = node.to_argo(3)
+    templates = node.get_templates(
+        step_counter=1,
+        default_image="image",
+        image_pull_policy="Always",
+        default_secrets=None,
+        default_parameters=[],
+    )
 
-    assert isinstance(steps, list)
-    assert any("foreachmerge" in t.name for t in templates)
+    assert templates[0].name == "step-1-foreach"
+    assert templates[1].name == "step-1-foreach-double"
+    assert templates[2].name == "step-1-foreach-merge"
 
 
 def test_foreach_then_twice_raises():

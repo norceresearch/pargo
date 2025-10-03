@@ -8,7 +8,7 @@ from pydantic import BaseModel
 class Node(BaseModel):
     task: Any
 
-    def to_argo(self, **kwargs) -> tuple:
+    def get_templates(self, **kwargs) -> tuple:
         raise NotImplementedError
 
     def run(self):

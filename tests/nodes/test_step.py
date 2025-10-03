@@ -14,10 +14,16 @@ def test_stepnode_run(tmp_path):
     assert result["x"] == 6
 
 
-def test_stepnode_to_argo():
-    """Test that StepNode.to_argo gives the expected format."""
+def test_stepnode_get_templates():
+    """Test that StepNode.get_templates gives the expected format."""
     node = StepNode(task=double)
-    steps, templates = node.to_argo(1)
-    assert steps[0][0].name == "step1"
-    assert templates[0].name == "step1"
+    templates = node.get_templates(
+        step_counter=2,
+        default_image="image",
+        image_pull_policy="Always",
+        default_secrets=None,
+        default_parameters=[],
+    )
+
+    assert templates[0].name == "step-2-double"
     assert "python" in templates[0].script.command
