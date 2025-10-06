@@ -53,7 +53,7 @@ class When(Node):
         result = run_when(self.task.__name__, self.task.__module__)
         if result is True:
             self._then.run()
-        if result is False:
+        if result is False and self._otherwise is not None:
             self._otherwise.run()
 
     def get_templates(
@@ -67,7 +67,6 @@ class When(Node):
         block_name = f"step-{step_counter}-{self.argo_name}"
         when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
         then_name = block_name + "-then-" + self._then.argo_name
-        otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
 
         templates = [self.get_steps(block_name, default_parameters)]
 
@@ -95,28 +94,33 @@ class When(Node):
         template[0].name = then_name
         templates.extend(template)
 
-        template = self._otherwise.get_templates(
-            step_counter=step_counter,
-            default_image=default_image,
-            image_pull_policy=image_pull_policy,
-            default_secrets=default_secrets,
-            default_parameters=default_parameters,
-        )
-        template[0].name = otherwise_name
-        templates.extend(template)
+        if self._otherwise is not None:
+            otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
+            template = self._otherwise.get_templates(
+                step_counter=step_counter,
+                default_image=default_image,
+                image_pull_policy=image_pull_policy,
+                default_secrets=default_secrets,
+                default_parameters=default_parameters,
+            )
+            template[0].name = otherwise_name
+            templates.extend(template)
 
         return templates
 
     def get_steps(self, block_name: str, default_parameters: dict[str, Any]):
         when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
         then_name = block_name + "-then-" + self._then.argo_name
-        otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
         default = ",".join(
             f'"{k}": {{{{workflow.parameters.{k}}}}}' for k in default_parameters
         )
         default = f"{{{default}}}"
 
-        expression = f'steps["{when_name}"].outputs.parameters.outputs == "true" ? steps["{then_name}"].outputs.parameters.outputs : steps["{otherwise_name}"].outputs.parameters.outputs'
+        if self._otherwise is None:
+            expression = f'steps["{when_name}"].outputs.parameters.outputs == "true" ? steps["{then_name}"].outputs.parameters.outputs : inputs.parameters.inputs'
+        else:
+            otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
+            expression = f'steps["{when_name}"].outputs.parameters.outputs == "true" ? steps["{then_name}"].outputs.parameters.outputs : steps["{otherwise_name}"].outputs.parameters.outputs'
         steps = ArgoStepsTemplate(
             name=block_name,
             inputs={"parameters": [ArgoParameter(name="inputs", default=default)]},
@@ -148,20 +152,23 @@ class When(Node):
             ]
         )
 
-        steps.steps.append(
-            [
-                ArgoStep(
-                    name=then_name,
-                    template=then_name,
-                    when=f"{{{{steps.{when_name}.outputs.parameters.outputs}}}} == true",
-                    arguments={"parameters": parameters},
-                ),
+        decision_steps = [
+            ArgoStep(
+                name=then_name,
+                template=then_name,
+                when=f"{{{{steps.{when_name}.outputs.parameters.outputs}}}} == true",
+                arguments={"parameters": parameters},
+            )
+        ]
+        if self._otherwise is not None:
+            decision_steps.append(
                 ArgoStep(
                     name=otherwise_name,
                     template=otherwise_name,
                     when=f"{{{{steps.{when_name}.outputs.parameters.outputs}}}} == false",
                     arguments={"parameters": parameters},
-                ),
-            ]
-        )
+                )
+            )
+
+        steps.steps.append(decision_steps)
         return steps
