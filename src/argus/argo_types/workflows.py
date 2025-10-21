@@ -83,6 +83,23 @@ class ArgoStepsTemplate(BaseModel):
     outputs: dict[str, list[ArgoParameter]] | None = None
 
 
+class ArgoTask(BaseModel):
+    name: str
+    template: str
+    depends: str | None = None
+    when: str | None = None
+    withItems: list[Any] | str | None = None
+    withParam: Any = None
+    arguments: dict[str, list[ArgoParameter]] | None = None
+
+
+class ArgoDAGTemplate(BaseModel):
+    name: str
+    inputs: dict[str, list[ArgoParameter]] | None = None
+    dag: dict[str, list[ArgoTask]]
+    outputs: dict[str, list[ArgoParameter]] | None = None
+
+
 class ArgoScript(BaseModel):
     image: str | None
     command: list

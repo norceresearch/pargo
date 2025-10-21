@@ -64,6 +64,19 @@ def test_foreach_with_named_item(tmp_path):
     assert result["x"] == 1
 
 
+def test_foreach_with_empty_item(tmp_path):
+    """Test that Foreach skips then for empty list."""
+    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 5}))
+
+    node = Foreach([]).then(add_item)
+    node.run()
+
+    data_path = tmp_path / ".argus" / "data.json"
+    result = loads(data_path.read_text())
+    assert "y" not in result
+    assert result == {"x": 5}
+
+
 def test_foreach_get_templates_function():
     """Test that Foreach.get_templates produces the expected structure given a function."""
     node = Foreach(get_items).then(double)

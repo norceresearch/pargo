@@ -7,9 +7,9 @@ from typing import Any, Callable
 from loguru import logger
 
 from ..argo_types.workflows import (
+    ArgoDAGTemplate,
     ArgoParameter,
-    ArgoStep,
-    ArgoStepsTemplate,
+    ArgoTask,
 )
 from .node import Node
 from .run import argus_path, merge_foreach, run_foreach
@@ -62,10 +62,11 @@ class Foreach(Node):
             environ["ARGUS_ITEM"] = dumps({self.item_name: dumps(item)})
             result = self._then.run(write_data=False)
             results.append(result)
-        data_path.write_text(dumps(results))
 
-        environ["ARGUS_DATA"] = dumps(results)
-        merge_foreach()
+        if results:
+            data_path.write_text(dumps(results))
+            environ["ARGUS_DATA"] = dumps(results)
+            merge_foreach()
 
         logger.info("Foreach loop finished")
 
@@ -81,7 +82,7 @@ class Foreach(Node):
         then_name = block_name + "-" + self._then.argo_name
         merge_name = block_name + "-merge"
 
-        templates = [self.get_steps(block_name, default_parameters)]
+        templates = [self.get_dag(block_name, default_parameters)]
 
         if callable(self.task):
             foreach_name = (
@@ -134,7 +135,7 @@ class Foreach(Node):
 
         return templates
 
-    def get_steps(self, block_name: str, default_parameters: dict[str, Any]):
+    def get_dag(self, block_name: str, default_parameters: dict[str, Any]):
         then_name = block_name + "-" + self._then.argo_name
         merge_name = block_name + "-merge"
         default = ",".join(
@@ -142,18 +143,22 @@ class Foreach(Node):
         )
         default = f"{{{default}}}"
 
-        steps = ArgoStepsTemplate(
+        expression = (
+            f'tasks["{merge_name}"].status == "Succeeded" ? '
+            f'tasks["{merge_name}"].outputs.parameters.outputs : '
+            f"inputs.parameters.inputs"
+        )
+
+        dag_template = ArgoDAGTemplate(
             name=block_name,
             inputs={"parameters": [ArgoParameter(name="inputs", default=default)]},
-            steps=[],
+            dag={"tasks": []},
             outputs={
                 "parameters": [
                     ArgoParameter(
                         name="outputs",
-                        valueFrom={
-                            "parameter": f"{{{{steps.{merge_name}.outputs.parameters.outputs}}}}"
-                        },
-                    ),
+                        valueFrom={"expression": expression},
+                    )
                 ]
             },
         )
@@ -168,18 +173,18 @@ class Foreach(Node):
                     value="{{inputs.parameters.inputs}}",
                 )
             ]
-            steps.steps.append(
-                [
-                    ArgoStep(
-                        name=foreach_name,
-                        template=foreach_name,
-                        arguments={"parameters": parameters},
-                    )
-                ]
+            dag_template.dag["tasks"].append(
+                ArgoTask(
+                    name=foreach_name,
+                    template=foreach_name,
+                    arguments={"parameters": parameters},
+                )
             )
-            with_param = f"{{{{steps.{foreach_name}.outputs.parameters.outputs}}}}"
+            with_param = f"{{{{tasks.{foreach_name}.outputs.parameters.outputs}}}}"
         elif isinstance(self.task, list):
             with_param = dumps([dumps(task) for task in self.task])
+        else:
+            with_param = None
 
         parameters = [
             ArgoParameter(
@@ -191,30 +196,29 @@ class Foreach(Node):
                 value="{{item}}",
             ),
         ]
-        steps.steps.append(
-            [
-                ArgoStep(
-                    name=then_name,
-                    template=then_name,
-                    arguments={"parameters": parameters},
-                    withParam=with_param,
-                )
-            ]
+        dag_template.dag["tasks"].append(
+            ArgoTask(
+                name=then_name,
+                template=then_name,
+                arguments={"parameters": parameters},
+                withParam=with_param,
+                depends=f"{foreach_name}.Succeeded" if callable(self.task) else None,
+            )
         )
 
         parameters = [
             ArgoParameter(
                 name="inputs",
-                value=f"{{{{steps.{then_name}.outputs.parameters.outputs}}}}",
+                value=f"{{{{tasks.{then_name}.outputs.parameters.outputs}}}}",
             )
         ]
-        steps.steps.append(
-            [
-                ArgoStep(
-                    name=merge_name,
-                    template=merge_name,
-                    arguments={"parameters": parameters},
-                )
-            ]
+        dag_template.dag["tasks"].append(
+            ArgoTask(
+                name=merge_name,
+                template=merge_name,
+                arguments={"parameters": parameters},
+                depends=f"{then_name}.Succeeded",
+            )
         )
-        return steps
+
+        return dag_template
