@@ -107,6 +107,7 @@ class ArgoScript(BaseModel):
     envFrom: list[ArgoSecretRef] | None = None
     env: list[ArgoParameter] | None = None
     volumeMounts: list[ArgoVolumeMount] | None = None
+    terminationMessagePolicy: str = "FallbackToLogsOnError"
     imagePullPolicy: str | None = None
 
 
