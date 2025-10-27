@@ -12,6 +12,8 @@ class Condition(BaseModel):
     items: list[str]
 
     def __and__(self, other):
+        from .workflow import Workflow
+
         if len(self.items) > 1:
             raise ValueError("Invalid: cannot do (A | B) & C")
 
