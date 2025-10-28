@@ -86,6 +86,7 @@ def test_foreach_get_templates_function():
         image_pull_policy="Always",
         default_secrets=None,
         default_parameters=[],
+        default_retry=2,
     )
 
     assert templates[0].name == "step-1-foreach"
@@ -103,6 +104,7 @@ def test_foreach_get_templates_list():
         image_pull_policy="Always",
         default_secrets=None,
         default_parameters=[],
+        default_retry=None,
     )
 
     assert templates[0].name == "step-1-foreach"

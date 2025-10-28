@@ -2,6 +2,7 @@ from typing import Any
 
 from ..argo_types.workflows import (
     ArgoParameter,
+    ArgoRetryStrategy,
     ArgoScript,
     ArgoScriptTemplate,
     ArgoSecretRef,
@@ -17,11 +18,15 @@ def worker_template(
     secrets: list[str] | None,
     parallelism: int | None,
     outpath: str,
+    retry: int | ArgoRetryStrategy | None = None,
 ):
     if secrets:
         secrets = [
             ArgoSecretRef(secretRef=ArgoParameter(name=secret)) for secret in secrets
         ]
+
+    if isinstance(retry, int):
+        retry = ArgoRetryStrategy(limit=retry)
 
     default = (
         "{"
@@ -48,6 +53,7 @@ def worker_template(
             "parameters": [ArgoParameter(name="outputs", valueFrom={"path": outpath})]
         },
         parallelism=parallelism,
+        retryStrategy=retry,
     )
 
     return template

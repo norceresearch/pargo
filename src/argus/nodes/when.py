@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from ..argo_types.workflows import (
     ArgoParameter,
+    ArgoRetryStrategy,
     ArgoStep,
     ArgoStepsTemplate,
 )
@@ -21,6 +22,7 @@ class When(Node):
     task: WhenTask
     image: str | None = None
     secrets: list[str] | None = None
+    retry: int | ArgoRetryStrategy | None = None
     _then: StepNode | None = None
     _otherwise: StepNode | None = None
     _prev: str = "when"
@@ -63,6 +65,7 @@ class When(Node):
         image_pull_policy: str,
         default_secrets: list[str] | None,
         default_parameters: dict[str, Any],
+        default_retry: int | ArgoRetryStrategy | None,
     ):
         block_name = f"step-{step_counter}-{self.argo_name}"
         when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
@@ -81,6 +84,7 @@ class When(Node):
             secrets=self.secrets or default_secrets,
             parallelism=None,
             outpath="/tmp/when.json",
+            retry=self.retry or default_retry,
         )
         templates.append(template)
 
@@ -90,6 +94,7 @@ class When(Node):
             image_pull_policy=image_pull_policy,
             default_secrets=default_secrets,
             default_parameters=default_parameters,
+            default_retry=self.retry or default_retry,
         )
         template[0].name = then_name
         templates.extend(template)
@@ -102,6 +107,7 @@ class When(Node):
                 image_pull_policy=image_pull_policy,
                 default_secrets=default_secrets,
                 default_parameters=default_parameters,
+                default_retry=self.retry or default_retry,
             )
             template[0].name = otherwise_name
             templates.extend(template)

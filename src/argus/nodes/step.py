@@ -4,6 +4,7 @@ from json import dumps, loads
 from os import environ
 from typing import Any, Callable
 
+from ..argo_types.workflows import ArgoRetryStrategy
 from .node import Node
 from .run import argus_path, run_step
 from .worker_template import worker_template
@@ -16,6 +17,7 @@ class StepNode(Node):
     image: str | None = None
     secrets: list[str] | None = None
     parallelism: int | None = None
+    retry: int | ArgoRetryStrategy | None = None
 
     @property
     def task_name(self):
@@ -41,6 +43,7 @@ class StepNode(Node):
         image_pull_policy: str,
         default_secrets: list[str] | None,
         default_parameters: dict[str, Any],
+        default_retry: int | ArgoRetryStrategy | None,
     ):
         template_name = f"step-{step_counter}-{self.argo_name}"
         script_source = f'from {run_step.__module__} import run_step\nrun_step("{self.task_name}", "{self.task.__module__}")'
@@ -54,6 +57,7 @@ class StepNode(Node):
             secrets=self.secrets or default_secrets,
             parallelism=self.parallelism,
             outpath="/tmp/data.json",
+            retry=self.retry or default_retry,
         )
 
         return [template]

@@ -14,6 +14,7 @@ from .argo_types.workflows import (
     ArgoCronWorkflowSpec,
     ArgoParameter,
     ArgoPodGC,
+    ArgoRetryStrategy,
     ArgoStep,
     ArgoStepsTemplate,
     ArgoTTLStrategy,
@@ -41,6 +42,7 @@ class Workflow(BaseModel):
     trigger_on_parameters: list[dict[str, Any]] | None = None
     parallelism: int | None = None
     pod_metadata: None | PodMetadata = None
+    retry: int | ArgoRetryStrategy | None = 2
     _nodes: list[Node] = []
 
     _annotations = __annotations__
@@ -94,6 +96,7 @@ class Workflow(BaseModel):
                 image_pull_policy=self.image_pull_policy,
                 default_secrets=self.secrets,
                 default_parameters=self.parameters,
+                default_retry=self.retry,
             )
             s = ArgoStep(
                 name=f"step-{ind}-{node.argo_name}",

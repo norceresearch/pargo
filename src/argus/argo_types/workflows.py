@@ -15,6 +15,22 @@ class ArgoPodGC(BaseModel):
     strategy: str = "OnPodCompletion"
 
 
+class ArgoBackoff(BaseModel):
+    cap: None | str = None
+    duration: str = "1m"
+    factor: int = 2
+    maxDuration: None | str = None
+
+
+class ArgoRetryStrategy(BaseModel):
+    backoff: None | ArgoBackoff = ArgoBackoff()
+    expression: None | str = None
+    limit: int = 2
+    retryPolicy: Literal["Always", "OnFailure", "OnError", "OnTransientError"] = (
+        "Always"
+    )
+
+
 class ArgoWorkflowMetadata(BaseModel):
     generateName: str | None = None
     name: str | None = None
@@ -118,6 +134,7 @@ class ArgoScriptTemplate(BaseModel):
     outputs: dict[str, list[ArgoParameter]] | None = None
     serviceAccountName: str = "argo-service-account"
     parallelism: int | None = None
+    retryStrategy: ArgoRetryStrategy | None = None
 
 
 class ArgoWorkflow(BaseModel):

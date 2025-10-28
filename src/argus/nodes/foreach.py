@@ -9,6 +9,7 @@ from loguru import logger
 from ..argo_types.workflows import (
     ArgoDAGTemplate,
     ArgoParameter,
+    ArgoRetryStrategy,
     ArgoTask,
 )
 from .node import Node
@@ -24,6 +25,7 @@ class Foreach(Node):
     item_name: str = "item"
     image: str | None = None
     secrets: list[str] | None = None
+    retry: int | ArgoRetryStrategy | None = None
     _then: StepNode | None = None
     _prev: str = "foreach"
 
@@ -77,6 +79,7 @@ class Foreach(Node):
         image_pull_policy: str,
         default_secrets: list[str] | None,
         default_parameters: dict[str, Any],
+        default_retry: int | ArgoRetryStrategy | None,
     ):
         block_name = f"step-{step_counter}-{self.argo_name}"
         then_name = block_name + "-" + self._then.argo_name
@@ -98,6 +101,7 @@ class Foreach(Node):
                 secrets=self.secrets or default_secrets,
                 parallelism=None,
                 outpath="/tmp/foreach.json",
+                retry=self.retry or default_retry,
             )
             templates.append(template)
 
@@ -107,6 +111,7 @@ class Foreach(Node):
             image_pull_policy=image_pull_policy,
             default_secrets=default_secrets,
             default_parameters=default_parameters,
+            default_retry=self.retry or default_retry,
         )
         template[0].name = then_name
         template[0].script.env.append(
@@ -130,6 +135,7 @@ class Foreach(Node):
             secrets=self.secrets or default_secrets,
             parallelism=None,
             outpath="/tmp/data.json",
+            retry=None,
         )
         templates.append(template)
 

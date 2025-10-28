@@ -56,6 +56,7 @@ def test_when_get_templates():
         image_pull_policy="Always",
         default_secrets=None,
         default_parameters=[],
+        default_retry=None,
     )
 
     assert templates[0].name == "step-1-when"
