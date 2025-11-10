@@ -4,9 +4,12 @@ repos:
     hooks:
       - id: ruff
         name: lint
-        args: [ --fix ]
+        args: [--fix]
+        files: ^libs/argus/
       - id: ruff-format
         name: format
+        files: ^libs/argus/
       - id: ruff
         name: sort imports
-        args: [ --select, I, --fix]
+        args: [--select, I, --fix]
+        files: ^libs/argus/
