@@ -1,86 +1,70 @@
+from __future__ import annotations
+
+from typing import Literal, TypeAlias
+
 from pydantic import BaseModel
 
-from .workflows import ArgoParameter
+from .primitives import (
+    Metadata,
+    Parameter,
+)
+from .workflows import WorkflowResource
+
+ParameterMap: TypeAlias = dict[str, list[Parameter]] | None
 
 
-class ArgoWorkflowTemplateRef(BaseModel):
-    name: str
+class Source(BaseModel):
+    resource: WorkflowResource
 
 
-class ArgoWorkflowSpec(BaseModel):
-    workflowTemplateRef: ArgoWorkflowTemplateRef
-    arguments: dict[str, list[ArgoParameter]] | None = None
-
-
-class ArgoWorkflowMetadata(BaseModel):
-    generateName: str | None = None
-    namespace: str | None = None
-
-
-class ArgoWorkflowResource(BaseModel):
-    apiVersion: str
-    kind: str
-    metadata: ArgoWorkflowMetadata
-    spec: ArgoWorkflowSpec
-
-
-class ArgoWorkflowSource(BaseModel):
-    resource: ArgoWorkflowResource
-
-
-class ArgoWorkflowTrigger(BaseModel):
+class ArgoWorkflow(BaseModel):
     group: str
     version: str
     resource: str
     operation: str
-    source: ArgoWorkflowSource
+    source: Source
 
 
-class ArgoTriggerTemplate(BaseModel):
+class TriggerTemplate(BaseModel):
     name: str
     conditions: str | None = None
-    argoWorkflow: ArgoWorkflowTrigger
+    argoWorkflow: ArgoWorkflow
 
 
-class ArgoTrigger(BaseModel):
-    template: ArgoTriggerTemplate
+class Trigger(BaseModel):
+    template: TriggerTemplate
 
 
-class ArgoFilterData(BaseModel):
+class FilterData(BaseModel):
     path: str
     type: str
     value: list[str]
 
 
-class ArgoFilters(BaseModel):
-    data: list[ArgoFilterData]
+class Filters(BaseModel):
+    data: list[FilterData]
 
 
-class ArgoDependency(BaseModel):
+class Dependency(BaseModel):
     name: str
     eventSourceName: str
     eventName: str
-    filters: ArgoFilters | None = None
+    filters: Filters | None = None
 
 
-class ArgoTemplate(BaseModel):
+class EventTemplate(BaseModel):
     serviceAccountName: str
 
 
-class ArgoSpec(BaseModel):
+class EventSpec(BaseModel):
     eventBusName: str
-    template: ArgoTemplate
-    dependencies: list[ArgoDependency]
-    triggers: list[ArgoTrigger]
+    template: EventTemplate
+    dependencies: list[Dependency]
+    triggers: list[Trigger]
 
 
-class ArgoMetadata(BaseModel):
-    name: str
-    namespace: str = "argo-workflows"
-
-
-class ArgoSensor(BaseModel):
+class EventSensor(BaseModel):
     apiVersion: str
-    kind: str = "Sensor"
-    metadata: ArgoMetadata
-    spec: ArgoSpec
+    kind: Literal["Sensor"] = "Sensor"
+    metadata: Metadata
+    spec: EventSpec

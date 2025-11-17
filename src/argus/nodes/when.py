@@ -5,10 +5,10 @@ from os import environ
 from typing import Any, Callable
 
 from ..argo_types.workflows import (
-    ArgoParameter,
-    ArgoRetryStrategy,
-    ArgoStep,
-    ArgoStepsTemplate,
+    Parameter,
+    RetryStrategy,
+    StepsTemplate,
+    Task,
 )
 from .node import Node
 from .run import argus_path, run_when
@@ -22,7 +22,7 @@ class When(Node):
     task: WhenTask
     image: str | None = None
     secrets: list[str] | None = None
-    retry: int | ArgoRetryStrategy | None = None
+    retry: int | RetryStrategy | None = None
     _then: StepNode | None = None
     _otherwise: StepNode | None = None
     _prev: str = "when"
@@ -65,7 +65,7 @@ class When(Node):
         image_pull_policy: str,
         default_secrets: list[str] | None,
         default_parameters: dict[str, Any],
-        default_retry: int | ArgoRetryStrategy | None,
+        default_retry: int | RetryStrategy | None,
     ):
         block_name = f"step-{step_counter}-{self.argo_name}"
         when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
@@ -127,13 +127,13 @@ class When(Node):
         else:
             otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
             expression = f'steps["{when_name}"].outputs.parameters.outputs == "true" ? steps["{then_name}"].outputs.parameters.outputs : steps["{otherwise_name}"].outputs.parameters.outputs'
-        steps = ArgoStepsTemplate(
+        steps = StepsTemplate(
             name=block_name,
-            inputs={"parameters": [ArgoParameter(name="inputs", default=default)]},
+            inputs={"parameters": [Parameter(name="inputs", default=default)]},
             steps=[],
             outputs={
                 "parameters": [
-                    ArgoParameter(
+                    Parameter(
                         name="outputs",
                         valueFrom={"expression": expression},
                     ),
@@ -142,7 +142,7 @@ class When(Node):
         )
 
         parameters = [
-            ArgoParameter(
+            Parameter(
                 name="inputs",
                 value="{{inputs.parameters.inputs}}",
             )
@@ -150,7 +150,7 @@ class When(Node):
 
         steps.steps.append(
             [
-                ArgoStep(
+                Task(
                     name=when_name,
                     template=when_name,
                     arguments={"parameters": parameters},
@@ -159,7 +159,7 @@ class When(Node):
         )
 
         decision_steps = [
-            ArgoStep(
+            Task(
                 name=then_name,
                 template=then_name,
                 when=f"{{{{steps.{when_name}.outputs.parameters.outputs}}}} == true",
@@ -168,7 +168,7 @@ class When(Node):
         ]
         if self._otherwise is not None:
             decision_steps.append(
-                ArgoStep(
+                Task(
                     name=otherwise_name,
                     template=otherwise_name,
                     when=f"{{{{steps.{when_name}.outputs.parameters.outputs}}}} == false",

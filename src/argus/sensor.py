@@ -8,22 +8,19 @@ from pydantic import BaseModel
 from yaml import safe_dump
 
 from .argo_types.events import (
-    ArgoDependency,
-    ArgoFilterData,
-    ArgoFilters,
-    ArgoMetadata,
-    ArgoSensor,
-    ArgoSpec,
-    ArgoTemplate,
-    ArgoTrigger,
-    ArgoTriggerTemplate,
-    ArgoWorkflowMetadata,
-    ArgoWorkflowResource,
-    ArgoWorkflowSource,
-    ArgoWorkflowSpec,
-    ArgoWorkflowTemplateRef,
-    ArgoWorkflowTrigger,
+    ArgoWorkflow,
+    Dependency,
+    EventSensor,
+    EventSpec,
+    EventTemplate,
+    FilterData,
+    Filters,
+    Source,
+    Trigger,
+    TriggerTemplate,
 )
+from .argo_types.primitives import Metadata, TemplateRef
+from .argo_types.workflows import WorkflowResource, WorkflowSpec
 
 if TYPE_CHECKING:
     from .workflow import Condition
@@ -38,18 +35,18 @@ class Sensor(BaseModel):
         dependencies = []
         for name in self.trigger_on.names:
             dependencies.append(
-                ArgoDependency(
+                Dependency(
                     name=name,
                     eventSourceName="argo-workflow-events",
                     eventName="workflow-events",
-                    filters=ArgoFilters(
+                    filters=Filters(
                         data=[
-                            ArgoFilterData(
+                            FilterData(
                                 path="body.metadata.name",
                                 type="string",
                                 value=[f"^{name}-.*"],
                             ),
-                            ArgoFilterData(
+                            FilterData(
                                 path="body.status.phase",
                                 type="string",
                                 value=["Succeeded"],
@@ -80,27 +77,25 @@ class Sensor(BaseModel):
             zip(self.trigger_on.items, arguments)
         ):
             triggers.append(
-                ArgoTrigger(
-                    template=ArgoTriggerTemplate(
+                Trigger(
+                    template=TriggerTemplate(
                         name=self.name + str(ind),
                         conditions=condition,
-                        argoWorkflow=ArgoWorkflowTrigger(
+                        argoWorkflow=ArgoWorkflow(
                             group="argoproj.io",
                             version="v1alpha1",
                             resource="workflows",
                             operation="submit",
-                            source=ArgoWorkflowSource(
-                                resource=ArgoWorkflowResource(
+                            source=Source(
+                                resource=WorkflowResource(
                                     apiVersion="argoproj.io/v1alpha1",
                                     kind="Workflow",
-                                    metadata=ArgoWorkflowMetadata(
+                                    metadata=Metadata(
                                         generateName=f"{self.name}-",
                                         namespace="argo-workflows",
                                     ),
-                                    spec=ArgoWorkflowSpec(
-                                        workflowTemplateRef=ArgoWorkflowTemplateRef(
-                                            name=self.name
-                                        ),
+                                    spec=WorkflowSpec(
+                                        workflowTemplateRef=TemplateRef(name=self.name),
                                         arguments=argument,
                                     ),
                                 )
@@ -112,13 +107,13 @@ class Sensor(BaseModel):
         return triggers
 
     def to_argo(self):
-        sensor = ArgoSensor(
+        sensor = EventSensor(
             apiVersion="argoproj.io/v1alpha1",
             kind="Sensor",
-            metadata=ArgoMetadata(name=self.name),
-            spec=ArgoSpec(
+            metadata=Metadata(name=self.name),
+            spec=EventSpec(
                 eventBusName="argoevents",
-                template=ArgoTemplate(serviceAccountName="argo-service-account"),
+                template=EventTemplate(serviceAccountName="argo-service-account"),
                 dependencies=self.argo_dependencies(),
                 triggers=self.argo_triggers(),
             ),

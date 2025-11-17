@@ -9,20 +9,24 @@ from loguru import logger
 from pydantic import BaseModel
 from yaml import safe_dump
 
-from .argo_types.workflows import (
-    ArgoCronWorkflow,
-    ArgoCronWorkflowSpec,
-    ArgoParameter,
-    ArgoPodGC,
-    ArgoRetryStrategy,
-    ArgoStep,
-    ArgoStepsTemplate,
-    ArgoTTLStrategy,
-    ArgoWorkflow,
-    ArgoWorkflowMetadata,
-    ArgoWorkflowSpec,
-    ArgoWorkflowTemplateRef,
+from .argo_types.cron import (
+    CronWorkflow,
+    CronWorkflowSpec,
+)
+from .argo_types.primitives import (
+    Metadata,
+    Parameter,
+    PodGC,
     PodMetadata,
+    RetryStrategy,
+    TemplateRef,
+    TTLStrategy,
+)
+from .argo_types.workflows import (
+    StepsTemplate,
+    Task,
+    WorkflowResource,
+    WorkflowSpec,
 )
 from .nodes.node import Node
 from .nodes.run import argus_path
@@ -42,7 +46,7 @@ class Workflow(BaseModel):
     trigger_on_parameters: list[dict[str, Any]] | None = None
     parallelism: int | None = None
     pod_metadata: None | PodMetadata = None
-    retry: int | ArgoRetryStrategy | None = 2
+    retry: int | RetryStrategy | None = 2
     _nodes: list[Node] = []
 
     _annotations = __annotations__
@@ -86,7 +90,7 @@ class Workflow(BaseModel):
 
     def to_argo(self):
         """Generate a pydantic model of the workflow."""
-        steps = ArgoStepsTemplate(name="main", steps=[])
+        steps = StepsTemplate(name="main", steps=[])
         arguments = None
         templates = []
         for ind, node in enumerate(self._nodes):
@@ -98,7 +102,7 @@ class Workflow(BaseModel):
                 default_parameters=self.parameters,
                 default_retry=self.retry,
             )
-            s = ArgoStep(
+            s = Task(
                 name=f"step-{ind}-{node.argo_name}",
                 template=f"step-{ind}-{node.argo_name}",
                 arguments=arguments,
@@ -107,7 +111,7 @@ class Workflow(BaseModel):
             templates.extend(t)
             arguments = self.next_argument(ind, node.argo_name)
 
-        spec = ArgoWorkflowSpec(
+        spec = WorkflowSpec(
             entrypoint="main",
             arguments={
                 "parameters": [
@@ -116,15 +120,15 @@ class Workflow(BaseModel):
                 ]
             },
             templates=[steps] + templates,
-            ttlStrategy=ArgoTTLStrategy(),
-            podGC=ArgoPodGC(),
+            ttlStrategy=TTLStrategy(),
+            podGC=PodGC(),
             parallelism=self.parallelism,
             podMetadata=self.pod_metadata,
         )
 
-        wf = ArgoWorkflow(
+        wf = WorkflowResource(
             kind="WorkflowTemplate",
-            metadata=ArgoWorkflowMetadata(name=self.name),
+            metadata=Metadata(name=self.name),
             spec=spec,
         )
         return wf
@@ -152,12 +156,12 @@ class Workflow(BaseModel):
 
     def to_yaml_cron(self, path):
         """Write manifest for scheduled execution on Argo Workflows."""
-        wf = ArgoCronWorkflow(
-            metadata=ArgoWorkflowMetadata(name=self.name),
-            spec=ArgoCronWorkflowSpec(
+        wf = CronWorkflow(
+            metadata=Metadata(name=self.name),
+            spec=CronWorkflowSpec(
                 schedules=self.schedules,
-                workflowSpec=ArgoWorkflowTemplateRef(
-                    workflowTemplateRef=ArgoParameter(name=self.name)
+                workflowSpec=WorkflowSpec(
+                    workflowTemplateRef=TemplateRef(name=self.name)
                 ),
             ),
         )
@@ -169,7 +173,7 @@ class Workflow(BaseModel):
     @staticmethod
     def next_argument(ind: int, name: str):
         parameters = [
-            ArgoParameter(
+            Parameter(
                 name="inputs",
                 value=f"{{{{steps.step-{ind}-{name}.outputs.parameters.outputs}}}}",
             )

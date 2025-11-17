@@ -7,10 +7,10 @@ from typing import Any, Callable
 from loguru import logger
 
 from ..argo_types.workflows import (
-    ArgoDAGTemplate,
-    ArgoParameter,
-    ArgoRetryStrategy,
-    ArgoTask,
+    DAGTemplate,
+    Parameter,
+    RetryStrategy,
+    Task,
 )
 from .node import Node
 from .run import argus_path, merge_foreach, run_foreach
@@ -25,7 +25,7 @@ class Foreach(Node):
     item_name: str = "item"
     image: str | None = None
     secrets: list[str] | None = None
-    retry: int | ArgoRetryStrategy | None = None
+    retry: int | RetryStrategy | None = None
     _then: StepNode | None = None
     _prev: str = "foreach"
 
@@ -79,7 +79,7 @@ class Foreach(Node):
         image_pull_policy: str,
         default_secrets: list[str] | None,
         default_parameters: dict[str, Any],
-        default_retry: int | ArgoRetryStrategy | None,
+        default_retry: int | RetryStrategy | None,
     ):
         block_name = f"step-{step_counter}-{self.argo_name}"
         then_name = block_name + "-" + self._then.argo_name
@@ -115,12 +115,12 @@ class Foreach(Node):
         )
         template[0].name = then_name
         template[0].script.env.append(
-            ArgoParameter(
+            Parameter(
                 name="ARGUS_ITEM",
                 value=f'{{"{self.item_name}": "{{{{inputs.parameters.item}}}}"}}',
             )
         )
-        template[0].inputs["parameters"].append(ArgoParameter(name="item"))
+        template[0].inputs["parameters"].append(Parameter(name="item"))
         templates.extend(template)
 
         script_source = (
@@ -155,13 +155,13 @@ class Foreach(Node):
             f"inputs.parameters.inputs"
         )
 
-        dag_template = ArgoDAGTemplate(
+        dag_template = DAGTemplate(
             name=block_name,
-            inputs={"parameters": [ArgoParameter(name="inputs", default=default)]},
+            inputs={"parameters": [Parameter(name="inputs", default=default)]},
             dag={"tasks": []},
             outputs={
                 "parameters": [
-                    ArgoParameter(
+                    Parameter(
                         name="outputs",
                         valueFrom={"expression": expression},
                     )
@@ -174,13 +174,13 @@ class Foreach(Node):
                 block_name + "-" + self.task.__name__.lower().replace("_", "-")
             )
             parameters = [
-                ArgoParameter(
+                Parameter(
                     name="inputs",
                     value="{{inputs.parameters.inputs}}",
                 )
             ]
             dag_template.dag["tasks"].append(
-                ArgoTask(
+                Task(
                     name=foreach_name,
                     template=foreach_name,
                     arguments={"parameters": parameters},
@@ -193,17 +193,17 @@ class Foreach(Node):
             with_param = None
 
         parameters = [
-            ArgoParameter(
+            Parameter(
                 name="inputs",
                 value="{{inputs.parameters.inputs}}",
             ),
-            ArgoParameter(
+            Parameter(
                 name="item",
                 value="{{item}}",
             ),
         ]
         dag_template.dag["tasks"].append(
-            ArgoTask(
+            Task(
                 name=then_name,
                 template=then_name,
                 arguments={"parameters": parameters},
@@ -213,13 +213,13 @@ class Foreach(Node):
         )
 
         parameters = [
-            ArgoParameter(
+            Parameter(
                 name="inputs",
                 value=f"{{{{tasks.{then_name}.outputs.parameters.outputs}}}}",
             )
         ]
         dag_template.dag["tasks"].append(
-            ArgoTask(
+            Task(
                 name=merge_name,
                 template=merge_name,
                 arguments={"parameters": parameters},

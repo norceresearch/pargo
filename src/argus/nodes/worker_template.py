@@ -1,11 +1,11 @@
 from typing import Any
 
 from ..argo_types.workflows import (
-    ArgoParameter,
-    ArgoRetryStrategy,
-    ArgoScript,
-    ArgoScriptTemplate,
-    ArgoSecretRef,
+    Parameter,
+    RetryStrategy,
+    Script,
+    ScriptTemplate,
+    SecretRef,
 )
 
 
@@ -18,39 +18,37 @@ def worker_template(
     secrets: list[str] | None,
     parallelism: int | None,
     outpath: str,
-    retry: int | ArgoRetryStrategy | None = None,
+    retry: int | RetryStrategy | None = None,
 ):
     if secrets:
-        secrets = [
-            ArgoSecretRef(secretRef=ArgoParameter(name=secret)) for secret in secrets
-        ]
+        secrets = [SecretRef(secretRef=Parameter(name=secret)) for secret in secrets]
 
     if isinstance(retry, int):
-        retry = ArgoRetryStrategy(limit=retry)
+        retry = RetryStrategy(limit=retry)
 
     default = (
         "{"
         + ",".join(f'"{k}": {{{{workflow.parameters.{k}}}}}' for k in parameters)
         + "}"
     )
-    inputs = {"parameters": [ArgoParameter(name="inputs", default=default)]}
+    inputs = {"parameters": [Parameter(name="inputs", default=default)]}
 
-    template = ArgoScriptTemplate(
+    template = ScriptTemplate(
         name=template_name,
-        script=ArgoScript(
+        script=Script(
             image=image,
             command=["python"],
             source=script_source,
             env=[
-                ArgoParameter(name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"),
-                ArgoParameter(name="ARGUS_DIR", value="/tmp"),
+                Parameter(name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"),
+                Parameter(name="ARGUS_DIR", value="/tmp"),
             ],
             envFrom=secrets,
             imagePullPolicy=image_pull_policy,
         ),
         inputs=inputs,
         outputs={
-            "parameters": [ArgoParameter(name="outputs", valueFrom={"path": outpath})]
+            "parameters": [Parameter(name="outputs", valueFrom={"path": outpath})]
         },
         parallelism=parallelism,
         retryStrategy=retry,
