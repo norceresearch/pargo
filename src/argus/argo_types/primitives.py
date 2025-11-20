@@ -33,6 +33,8 @@ class PodGC(BaseModel):
 
 
 class Backoff(BaseModel):
+    """Class for providing a tailored backoff strategy."""
+
     cap: None | str = None
     duration: str = "1m"
     factor: int = 2
@@ -40,6 +42,8 @@ class Backoff(BaseModel):
 
 
 class RetryStrategy(BaseModel):
+    """Class for providing a tailored retry strategy."""
+
     backoff: None | Backoff = Backoff()
     expression: None | str = None
     limit: int = 2

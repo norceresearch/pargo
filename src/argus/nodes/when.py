@@ -4,6 +4,8 @@ from json import dumps, loads
 from os import environ
 from typing import Any, Callable
 
+from pydantic import Field
+
 from ..argo_types.workflows import (
     Parameter,
     RetryStrategy,
@@ -19,10 +21,20 @@ WhenTask = Callable[..., bool]
 
 
 class When(Node):
-    task: WhenTask
-    image: str | None = None
-    secrets: list[str] | None = None
-    retry: int | RetryStrategy | None = None
+    """
+    Class for conditional execution of steps.
+    """
+
+    task: WhenTask = Field(description="Callable that returns a bool")
+    image: str | None = Field(
+        default=None, description="Overwrite workflow image for the WhenTask"
+    )
+    secrets: list[str] | None = Field(
+        default=None, description="Overwrite workflow secrets for the WhenTask"
+    )
+    retry: int | RetryStrategy | None = Field(
+        default=None, description="Overwrite workflow retry for the WhenTesk"
+    )
     _then: StepNode | None = None
     _otherwise: StepNode | None = None
     _prev: str = "when"
@@ -32,9 +44,11 @@ class When(Node):
 
     @property
     def argo_name(self):
+        """Name of the task."""
         return "when"
 
     def then(self, task: StepTask, **kwargs) -> When:
+        """Set the task to exectue when the condition evaluates to True."""
         if self._prev != "when":
             raise RuntimeError(".then(...) must follow When(...) ")
         self._then = StepNode(task=task, **kwargs)
@@ -42,6 +56,7 @@ class When(Node):
         return self
 
     def otherwise(self, task: StepTask, **kwargs) -> When:
+        """Set the optional task to execute when the condition evaluates to False."""
         if self._prev != "then":
             raise RuntimeError(".otherwise(...) must follow then(...) ")
         self._otherwise = StepNode(task=task, **kwargs)
@@ -49,6 +64,7 @@ class When(Node):
         return self
 
     def run(self):
+        """Run the When-block locally."""
         data_path = argus_path() / "data.json"
         data = loads(data_path.read_text())
         environ["ARGUS_DATA"] = dumps(data)
@@ -67,11 +83,12 @@ class When(Node):
         default_parameters: dict[str, Any],
         default_retry: int | RetryStrategy | None,
     ):
+        """Returns a list with the configured templates (StepsTemplate and ScriptTemplates). @private"""
         block_name = f"step-{step_counter}-{self.argo_name}"
         when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
         then_name = block_name + "-then-" + self._then.argo_name
 
-        templates = [self.get_steps(block_name, default_parameters)]
+        templates = [self._get_steps(block_name, default_parameters)]
 
         # when template
         script_source = f'from {run_when.__module__} import run_when\nrun_when("{self.task.__name__}", "{self.task.__module__}")'
@@ -114,7 +131,7 @@ class When(Node):
 
         return templates
 
-    def get_steps(self, block_name: str, default_parameters: dict[str, Any]):
+    def _get_steps(self, block_name: str, default_parameters: dict[str, Any]):
         when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
         then_name = block_name + "-then-" + self._then.argo_name
         default = ",".join(

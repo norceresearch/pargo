@@ -4,6 +4,8 @@ from json import dumps, loads
 from os import environ
 from typing import Any, Callable
 
+from pydantic import Field
+
 from ..argo_types.workflows import RetryStrategy
 from .node import Node
 from .run import argus_path, run_step
@@ -12,22 +14,35 @@ from .worker_template import worker_template
 StepTask = Callable[..., None | dict]
 
 
-class StepNode(Node):
-    task: StepTask
-    image: str | None = None
-    secrets: list[str] | None = None
-    parallelism: int | None = None
-    retry: int | RetryStrategy | None = None
+class StepNode(Node):  # FIXME Rename to Step to be consitent with When, Foreach
+    """Class for worker tasks."""
+
+    task: StepTask = Field(description="Callable worker task. Can return a dict")
+    image: str | None = Field(
+        default=None, description="Overwrite workflow image for the StepTask"
+    )
+    secrets: list[str] | None = Field(
+        default=None, description="Overwrite workflow secrets for the StepTask"
+    )
+    parallelism: int | None = Field(
+        default=None, description="Overwrite workflow parallelism for the StepTask"
+    )
+    retry: int | RetryStrategy | None = Field(
+        default=None, description="Overwrite workflow retry for the StepTask"
+    )
 
     @property
     def task_name(self):
+        """Name of the task."""
         return self.task.__name__
 
     @property
     def argo_name(self):
+        """Argo friendly name of the task."""
         return self.task.__name__.lower().replace("_", "-")
 
     def run(self, write_data: bool = True):
+        """Run the step locally"""
         data_path = argus_path() / "data.json"
         data = loads(data_path.read_text())
         environ["ARGUS_DATA"] = dumps(data)
@@ -45,6 +60,7 @@ class StepNode(Node):
         default_parameters: dict[str, Any],
         default_retry: int | RetryStrategy | None,
     ):
+        """Returns a single item list with the configures ScriptTemplate @private"""
         template_name = f"step-{step_counter}-{self.argo_name}"
         script_source = f'from {run_step.__module__} import run_step\nrun_step("{self.task_name}", "{self.task.__module__}")'
 

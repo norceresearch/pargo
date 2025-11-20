@@ -5,6 +5,7 @@ from os import environ
 from typing import Any, Callable
 
 from loguru import logger
+from pydantic import Field
 
 from ..argo_types.workflows import (
     DAGTemplate,
@@ -21,11 +22,26 @@ ForeachTask = Callable[..., list[Any]]
 
 
 class Foreach(Node):
-    task: ForeachTask | list[Any]
-    item_name: str = "item"
-    image: str | None = None
-    secrets: list[str] | None = None
-    retry: int | RetryStrategy | None = None
+    """
+    Class for executing steps for each item.
+    """
+
+    task: ForeachTask | list[Any] = Field(
+        description="Callable that returns a list or a list to iterate over."
+    )
+    item_name: str = Field(
+        default="item",
+        description="Name of the iterating variable. Will be available for the subsequet task.",
+    )
+    image: str | None = Field(
+        default=None, description="Overwrite workflow image for the ForeachTask"
+    )
+    secrets: list[str] | None = Field(
+        default=None, description="Overwrite workflow secrets for the ForeachTask"
+    )
+    retry: int | RetryStrategy | None = Field(
+        default=None, description="Overwrite workflow retry for the ForeachTask"
+    )
     _then: StepNode | None = None
     _prev: str = "foreach"
 
@@ -39,9 +55,11 @@ class Foreach(Node):
 
     @property
     def argo_name(self):
+        """Name of the task."""
         return "foreach"
 
     def then(self, task: StepTask, **kwargs) -> Foreach:
+        """Set the task to execute for each item."""
         if self._prev != "foreach":
             raise RuntimeError(".then(...) must follow Foreach(...) ")
         self._then = StepNode(task=task, **kwargs)
@@ -49,6 +67,7 @@ class Foreach(Node):
         return self
 
     def run(self):
+        """Run the Foreach-block locally"""
         logger.info("Running foreach loop")
         data_path = argus_path() / "data.json"
         if callable(self.task):
@@ -81,11 +100,12 @@ class Foreach(Node):
         default_parameters: dict[str, Any],
         default_retry: int | RetryStrategy | None,
     ):
+        """Returns a list with the configured templates (DAGTemplate and ScriptTemplates). @private"""
         block_name = f"step-{step_counter}-{self.argo_name}"
         then_name = block_name + "-" + self._then.argo_name
         merge_name = block_name + "-merge"
 
-        templates = [self.get_dag(block_name, default_parameters)]
+        templates = [self._get_dag(block_name, default_parameters)]
 
         if callable(self.task):
             foreach_name = (
@@ -141,7 +161,7 @@ class Foreach(Node):
 
         return templates
 
-    def get_dag(self, block_name: str, default_parameters: dict[str, Any]):
+    def _get_dag(self, block_name: str, default_parameters: dict[str, Any]):
         then_name = block_name + "-" + self._then.argo_name
         merge_name = block_name + "-merge"
         default = ",".join(

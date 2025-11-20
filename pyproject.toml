@@ -26,6 +26,7 @@ dev = [
     "pre-commit>=4.0.1",
     "pytest>=8.3.5",
     "ruff-lsp>=0.0.62",
+    "pdoc>=16.0.0",
 ]
 
 [tool.ruff]

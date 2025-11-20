@@ -12,7 +12,7 @@ build-test-libs-argus:
   script:
     - pushd libs/argus
     - uv build --wheel
-    - uv sync --locked
+    - uv sync --frozen
     - uv run pre-commit run --all-files
     - uv run pytest
   artifacts:

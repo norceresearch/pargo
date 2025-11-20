@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal
 
 from loguru import logger
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from yaml import safe_dump
 
 from .argo_types.cron import (
@@ -36,23 +36,60 @@ from .trigger_condition import Condition
 
 
 class Workflow(BaseModel):
-    name: str
-    parameters: dict[str, Any] = {}
-    image: str = "python:3.11"
-    image_pull_policy: Literal["Always", "IfNotPresent", "Never", None] = "Always"
-    schedules: list[str] | None = None
-    secrets: list[str] | None = None
-    trigger_on: Workflow | Condition | None = None
-    trigger_on_parameters: list[dict[str, Any]] | None = None
-    parallelism: int | None = None
-    pod_metadata: None | PodMetadata = None
-    retry: int | RetryStrategy | None = 2
+    """
+    Class for creating Argus workflows.
+    """
+
+    name: str = Field(
+        description="Name of the workflow",
+        example="test-workflow",
+        pattern=r"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$",
+        max_length=63,
+    )
+    parameters: dict[str, Any] = Field(
+        default={},
+        description="Named parameters that are available for the workflow tasks.",
+        example={"my_int": 3},
+    )
+    image: str = Field(
+        default="python:3.11",  # FIXME Don't make sense as argus is not in this image
+        description="Name of image to pull.",
+    )
+    image_pull_policy: Literal["Always", "IfNotPresent", "Never", None] = Field(
+        default="Always", description="Pull policy for `image`."
+    )
+    schedules: list[str] | None = Field(
+        default=None,
+        description="Set scheduled execution. Creates an additional cron-manifest when provided.",
+        example=["0 0 * * *"],
+    )
+    secrets: list[str] | None = Field(default=None, description="")
+    trigger_on: Workflow | Condition | None = Field(
+        default=None,
+        description="Set triggered execution by providing upstream workflow(s) this workflow depends on. Creates an additional sensor-manifest when provided.",
+        example="trigger_on=workflow1 | workflow2 & workflow3",
+    )
+    trigger_on_parameters: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Input parameters to the workflow when triggered by upstream workflows. Must match the length of `trigger_on`",
+    )
+    parallelism: int | None = Field(
+        default=None,
+        description="Maximum number of parallel containers running at the same time. Default (None) uses the maximum set by the service.",
+    )
+    pod_metadata: None | PodMetadata = Field(default=None, description="")
+    retry: int | RetryStrategy | None = Field(
+        default=2, description="Set the number of retries or the full retry strategy."
+    )
     _nodes: list[Node] = []
 
     _annotations = __annotations__
 
     @classmethod
     def new(cls, name: str, **kwargs) -> Workflow:
+        """
+        Create a new `Workflow` instance using `Workflow.new(name="myworkflow")`.
+        """
         return cls(name=name, **kwargs)
 
     def model_post_init(self, __context):
@@ -66,7 +103,7 @@ class Workflow(BaseModel):
                 )
 
     def next(self, node: Node | Callable, **kwargs) -> Workflow:
-        """Add steps to the workflow"""
+        """Add tasks or Nodes to the workflow. Callable tasks are converted to StepNodes."""
         if callable(node):
             node = StepNode(task=node, **kwargs)
         self._nodes.append(node)
@@ -109,7 +146,7 @@ class Workflow(BaseModel):
             )
             steps.steps.append([s])
             templates.extend(t)
-            arguments = self.next_argument(ind, node.argo_name)
+            arguments = self._next_argument(ind, node.argo_name)
 
         spec = WorkflowSpec(
             entrypoint="main",
@@ -133,7 +170,7 @@ class Workflow(BaseModel):
         )
         return wf
 
-    def to_yaml(self, path: Path | str = ""):
+    def to_yaml(self, path: Path | str = ""):  # FIXME write/dump ?
         """Write manifest(s) to run the workflow on Argo Workflows."""
         if isinstance(path, str):
             path = Path(path)
@@ -154,7 +191,7 @@ class Workflow(BaseModel):
             )
             sensor.to_yaml(path=path)
 
-    def to_yaml_cron(self, path):
+    def to_yaml_cron(self, path):  # FIXME write_cron_yaml/manifest?
         """Write manifest for scheduled execution on Argo Workflows."""
         wf = CronWorkflow(
             metadata=Metadata(name=self.name),
@@ -171,7 +208,7 @@ class Workflow(BaseModel):
         )
 
     @staticmethod
-    def next_argument(ind: int, name: str):
+    def _next_argument(ind: int, name: str):
         parameters = [
             Parameter(
                 name="inputs",

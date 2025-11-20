@@ -9,6 +9,10 @@ if TYPE_CHECKING:
 
 
 class Condition(BaseModel):
+    """
+    Class when combining workflows for conditional execution.
+    """
+
     items: list[str]
 
     def __and__(self, other):
