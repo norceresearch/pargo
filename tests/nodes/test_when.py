@@ -2,47 +2,47 @@ from json import dumps, loads
 
 import pytest
 
-from argus import When
-from argus.utils import choice, double, triple
+from pargo import When
+from pargo.utils import choice, double, triple
 
 
 def test_when_branch_then(tmp_path):
     """Test that then branch runs when expected."""
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 3}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 3}))
 
     node = When(choice).then(double).otherwise(triple)
     node.run()
 
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     result = loads(data_path.read_text())
     assert result["x"] == 6
 
 
 def test_when_branch_otherwise(tmp_path):
     """Test that otherwise branch runs when expected."""
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 4}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 4}))
 
     node = When(choice).then(double).otherwise(triple)
     node.run()
 
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     result = loads(data_path.read_text())
     assert result["x"] == 12
 
 
 def test_when_branch_then_only(tmp_path):
     """Test that then branch runs when expected."""
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 3}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 3}))
     node = When(choice).then(double)
     node.run()
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     result = loads(data_path.read_text())
     assert result["x"] == 6
 
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 4}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 4}))
     node = When(choice).then(double)
     node.run()
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     result = loads(data_path.read_text())
     assert result["x"] == 4
 

@@ -40,8 +40,8 @@ def worker_template(
             command=["python"],
             source=script_source,
             env=[
-                Parameter(name="ARGUS_DATA", value="{{inputs.parameters.inputs}}"),
-                Parameter(name="ARGUS_DIR", value="/tmp"),
+                Parameter(name="PARGO_DATA", value="{{inputs.parameters.inputs}}"),
+                Parameter(name="PARGO_DIR", value="/tmp"),
             ],
             envFrom=secrets,
             imagePullPolicy=image_pull_policy,

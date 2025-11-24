@@ -2,18 +2,18 @@ from json import dumps, loads
 
 import pytest
 
-from argus import Foreach
-from argus.utils import add_item, add_y, double, get_items, triple
+from pargo import Foreach
+from pargo.utils import add_item, add_y, double, get_items, triple
 
 
 def test_foreach_with_function(tmp_path):
     """Test that Foreach run as expected gived a function"""
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 2}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 2}))
 
     node = Foreach(get_items).then(double)
     node.run()
 
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     result = loads(data_path.read_text())
 
     assert "x" in result
@@ -23,12 +23,12 @@ def test_foreach_with_function(tmp_path):
 
 def test_foreach_with_list(tmp_path):
     """Test that Foreach runs as expected given a list"""
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 5}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 5}))
 
     node = Foreach(["a", "b"]).then(double)
     node.run()
 
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     result = loads(data_path.read_text())
     assert "x" in result
     assert isinstance(result["x"], int)
@@ -37,12 +37,12 @@ def test_foreach_with_list(tmp_path):
 
 def test_foreach_with_item(tmp_path):
     """Test that Foreach runs as expected when using the items in the given list."""
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 5}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 5}))
 
     node = Foreach([1, 2]).then(add_item)
     node.run()
 
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     result = loads(data_path.read_text())
     assert "y" in result
     assert isinstance(result["y"], list)
@@ -51,12 +51,12 @@ def test_foreach_with_item(tmp_path):
 
 def test_foreach_with_named_item(tmp_path):
     """Test that Foreach runs as expected when using named items in the given list."""
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 1}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 1}))
 
     node = Foreach([2, 5], item_name="y").then(add_y)
     node.run()
 
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     result = loads(data_path.read_text())
     assert "y" in result
     assert isinstance(result["y"], list)
@@ -66,12 +66,12 @@ def test_foreach_with_named_item(tmp_path):
 
 def test_foreach_with_empty_item(tmp_path):
     """Test that Foreach skips then for empty list."""
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 5}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 5}))
 
     node = Foreach([]).then(add_item)
     node.run()
 
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     result = loads(data_path.read_text())
     assert "y" not in result
     assert result == {"x": 5}

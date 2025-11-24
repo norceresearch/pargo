@@ -5,7 +5,7 @@ from pathlib import Path
 
 from pytest import raises
 
-from argus.cli.main import cli
+from pargo.cli.main import cli
 
 
 def write_workflow_file(tmp_path):
@@ -21,22 +21,22 @@ def write_workflow_file(tmp_path):
     }
     wf_path = tmp_path / "wf.py"
     wf_path.write_text(
-        "from argus import Workflow\n"
-        "from argus.utils import double\n"
+        "from pargo import Workflow\n"
+        "from pargo.utils import double\n"
         f"wf = Workflow.new(name='testflow', parameters={defaults}).next(double)\n"
     )
     return wf_path
 
 
 def test_cli_run(monkeypatch, tmp_path):
-    """Test that argus run executes the workflow."""
+    """Test that pargo run executes the workflow."""
 
     wf_path = write_workflow_file(tmp_path)
 
-    monkeypatch.setattr(sys, "argv", ["argus", "run", str(wf_path)])
+    monkeypatch.setattr(sys, "argv", ["pargo", "run", str(wf_path)])
     cli()
 
-    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 2
 
@@ -45,10 +45,10 @@ def test_cli_run_with_defaults(monkeypatch, tmp_path):
     """Test that defaults are set correctly."""
 
     wf_path = write_workflow_file(tmp_path)
-    monkeypatch.setattr(sys, "argv", ["argus", "run", str(wf_path)])
+    monkeypatch.setattr(sys, "argv", ["pargo", "run", str(wf_path)])
     cli()
 
-    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 2
     assert data["int_param"] == 5
@@ -66,7 +66,7 @@ def test_cli_run_with_params(monkeypatch, tmp_path):
         sys,
         "argv",
         [
-            "argus",
+            "pargo",
             "run",
             str(wf_path),
             "--param",
@@ -85,7 +85,7 @@ def test_cli_run_with_params(monkeypatch, tmp_path):
     )
     cli()
 
-    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 10
     assert data["int_param"] == 10
@@ -99,7 +99,7 @@ def test_cli_run_param_missing_equals(monkeypatch, tmp_path):
     """Test that bad key=value fails"""
     wf_path = write_workflow_file(tmp_path)
     monkeypatch.setattr(
-        sys, "argv", ["argus", "run", str(wf_path), "--param", "badparam"]
+        sys, "argv", ["pargo", "run", str(wf_path), "--param", "badparam"]
     )
     with raises(ValueError, match="Expected key=value"):
         cli()
@@ -109,19 +109,19 @@ def test_cli_run_with_name(monkeypatch, tmp_path):
     """Test that selected workflow runs using --name"""
     wf_path = tmp_path / "wf.py"
     wf_path.write_text(
-        "from argus import Workflow\n"
-        "from argus.utils import double\n"
+        "from pargo import Workflow\n"
+        "from pargo.utils import double\n"
         "wf1 = Workflow.new(name='first', parameters={'x': 1}).next(double)\n"
         "wf2 = Workflow.new(name='second', parameters={'x': 2}).next(double)\n"
     )
 
-    monkeypatch.setattr(sys, "argv", ["argus", "run", str(wf_path)])
+    monkeypatch.setattr(sys, "argv", ["pargo", "run", str(wf_path)])
     cli()
-    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 4
 
-    monkeypatch.setattr(sys, "argv", ["argus", "run", str(wf_path), "--name", "first"])
+    monkeypatch.setattr(sys, "argv", ["pargo", "run", str(wf_path), "--name", "first"])
     cli()
     data = loads(data_path.read_text())
     assert data["x"] == 2
@@ -130,16 +130,16 @@ def test_cli_run_with_name(monkeypatch, tmp_path):
 def test_cli_run_with_invalid_name(monkeypatch, tmp_path):
     """Test that unknown name fails."""
     wf_path = write_workflow_file(tmp_path)
-    monkeypatch.setattr(sys, "argv", ["argus", "run", str(wf_path), "--name", "nope"])
+    monkeypatch.setattr(sys, "argv", ["pargo", "run", str(wf_path), "--name", "nope"])
     with raises(RuntimeError, match="No workflow named 'nope'"):
         cli()
 
 
 def test_cli_generate(monkeypatch, tmp_path):
-    """Test that argus generate produces manifest."""
+    """Test that pargo generate produces manifest."""
     wf_path = write_workflow_file(tmp_path)
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(sys, "argv", ["argus", "generate", str(wf_path)])
+    monkeypatch.setattr(sys, "argv", ["pargo", "generate", str(wf_path)])
     cli()
 
     out_file = tmp_path / "testflow.yaml"
@@ -157,7 +157,7 @@ def test_cli_generate_with_outdir(monkeypatch, tmp_path):
     outdir.mkdir()
 
     monkeypatch.setattr(
-        sys, "argv", ["argus", "generate", str(wf_path), "--outdir", str(outdir)]
+        sys, "argv", ["pargo", "generate", str(wf_path), "--outdir", str(outdir)]
     )
     cli()
 
@@ -169,7 +169,7 @@ def test_cli_generate_with_name(monkeypatch, tmp_path):
     """Test that selected workflow manifest is generated using --name."""
     wf_path = tmp_path / "wf.py"
     wf_path.write_text(
-        "from argus import Workflow\n"
+        "from pargo import Workflow\n"
         "wf1 = Workflow.new(name='first')\n"
         "wf2 = Workflow.new(name='second')\n"
     )
@@ -180,7 +180,7 @@ def test_cli_generate_with_name(monkeypatch, tmp_path):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["argus", "generate", str(wf_path), "--name", "first", "--outdir", str(outdir)],
+        ["pargo", "generate", str(wf_path), "--name", "first", "--outdir", str(outdir)],
     )
     cli()
 

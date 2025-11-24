@@ -13,7 +13,7 @@ from ..argo_types.workflows import (
     Task,
 )
 from .node import Node
-from .run import argus_path, run_when
+from .run import pargo_path, run_when
 from .step import StepNode, StepTask
 from .worker_template import worker_template
 
@@ -65,9 +65,9 @@ class When(Node):
 
     def run(self):
         """Run the When-block locally."""
-        data_path = argus_path() / "data.json"
+        data_path = pargo_path() / "data.json"
         data = loads(data_path.read_text())
-        environ["ARGUS_DATA"] = dumps(data)
+        environ["PARGO_DATA"] = dumps(data)
         result = run_when(self.task.__name__, self.task.__module__)
         if result is True:
             self._then.run()

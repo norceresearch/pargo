@@ -1,12 +1,12 @@
 from json import dumps
 
-from argus.nodes.step import StepNode
-from argus.utils import double
+from pargo.nodes.step import StepNode
+from pargo.utils import double
 
 
 def test_stepnode_run(tmp_path):
     """Test that StepNode.run produce the expected output"""
-    (tmp_path / ".argus" / "data.json").write_text(dumps({"x": 3}))
+    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 3}))
 
     node = StepNode(task=double)
     result = node.run(write_data=True)

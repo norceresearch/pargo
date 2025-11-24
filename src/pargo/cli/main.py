@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from json import JSONDecodeError, loads
 from pathlib import Path
 
-from argus import Workflow
+from pargo import Workflow
 
 
 def load_workflows(path: Path) -> dict[str, Workflow]:
@@ -20,7 +20,7 @@ def load_workflows(path: Path) -> dict[str, Workflow]:
 
 
 def cli():
-    parser = ArgumentParser(prog="argus", description="Argus CLI")
+    parser = ArgumentParser(prog="pargo", description="Pargo CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run_parser = subparsers.add_parser("run", help="Run a workflow locally")

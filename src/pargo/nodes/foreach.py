@@ -14,7 +14,7 @@ from ..argo_types.workflows import (
     Task,
 )
 from .node import Node
-from .run import argus_path, merge_foreach, run_foreach
+from .run import merge_foreach, pargo_path, run_foreach
 from .step import StepNode, StepTask
 from .worker_template import worker_template
 
@@ -69,10 +69,10 @@ class Foreach(Node):
     def run(self):
         """Run the Foreach-block locally"""
         logger.info("Running foreach loop")
-        data_path = argus_path() / "data.json"
+        data_path = pargo_path() / "data.json"
         if callable(self.task):
             data = loads(data_path.read_text())
-            environ["ARGUS_DATA"] = dumps(data)
+            environ["PARGO_DATA"] = dumps(data)
             items = run_foreach(self.task.__name__, self.task.__module__)
         elif isinstance(self.task, list):
             items = self.task
@@ -80,13 +80,13 @@ class Foreach(Node):
         results = []
         for i, item in enumerate(items):
             logger.info(f"Processing item {i}: {item}")
-            environ["ARGUS_ITEM"] = dumps({self.item_name: dumps(item)})
+            environ["PARGO_ITEM"] = dumps({self.item_name: dumps(item)})
             result = self._then.run(write_data=False)
             results.append(result)
 
         if results:
             data_path.write_text(dumps(results))
-            environ["ARGUS_DATA"] = dumps(results)
+            environ["PARGO_DATA"] = dumps(results)
             merge_foreach()
 
         logger.info("Foreach loop finished")
@@ -136,7 +136,7 @@ class Foreach(Node):
         template[0].name = then_name
         template[0].script.env.append(
             Parameter(
-                name="ARGUS_ITEM",
+                name="PARGO_ITEM",
                 value=f'{{"{self.item_name}": "{{{{inputs.parameters.item}}}}"}}',
             )
         )

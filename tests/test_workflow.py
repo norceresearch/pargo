@@ -7,8 +7,8 @@ from shutil import which
 import pytest
 from pydantic_core._pydantic_core import ValidationError
 
-from argus import Foreach, When, Workflow
-from argus.utils import add_item, choice, double, get_items, triple
+from pargo import Foreach, When, Workflow
+from pargo.utils import add_item, choice, double, get_items, triple
 
 
 def lint_yaml(tmp_path):
@@ -27,7 +27,7 @@ def test_workflow_run(tmp_path):
     testflow = Workflow.new("testflow", parameters={"x": 2}).next(double).next(triple)
     testflow.run()
 
-    data_path = tmp_path / ".argus" / "data.json"
+    data_path = tmp_path / ".pargo" / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 12
 
@@ -104,14 +104,14 @@ def test_workflow_to_argo():
     step1 = argo_testflow.spec.templates[1]
     assert step1.name == "step-0-triple"
     assert step1.script.image == "image"
-    assert step1.script.env[0].name == "ARGUS_DATA"
+    assert step1.script.env[0].name == "PARGO_DATA"
     assert step1.script.envFrom[0].secretRef.name == "minio-s3-credentials-secret"
 
     # double step
     step1 = argo_testflow.spec.templates[2]
     assert step1.name == "step-1-double"
     assert step1.script.image == "other-image"
-    assert step1.script.env[0].name == "ARGUS_DATA"
+    assert step1.script.env[0].name == "PARGO_DATA"
     assert step1.script.envFrom[0].secretRef.name == "minio-s3-credentials-secret"
     assert step1.parallelism == 5
 
@@ -128,7 +128,7 @@ def test_workflow_duplicate_templates():
     assert argo_testflow.spec.templates[3].name == "step-2-double"
 
     testflow.run()
-    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "data.json"
     result = loads(data_path.read_text())
     assert result["x"] == 8
 
@@ -259,7 +259,7 @@ def test_workflow_complex(tmp_path):
     )
 
     testflow.run()
-    data_path = Path(environ["ARGUS_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "data.json"
     result = loads(data_path.read_text())
     assert result["x"] == 12
     assert sorted(result["y"]) == [13, 15, 17]

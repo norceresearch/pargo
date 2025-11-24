@@ -1,6 +1,6 @@
-# What is Argus?
+# What is Pargo?
 
-Argus is a lightweight Python library for creating Argo Workflows. Key features:
+Pargo is a lightweight Python library for creating Argo Workflows. Key features:
 
 - Generate manifests that can be synced to Argo Workflows using GitOps such as Flux or ArgoCD.
 - Generate cron-templates when schedules is provided for scheduled execution.
@@ -16,7 +16,7 @@ Not possible to install yet. Should be available on [github](https://github.com/
 # Basic usage
 
 ```python
-from argus import Workflow
+from pargo import Workflow
 
 def echo():
     print("Print. Or print not. There is no try.")
@@ -38,7 +38,7 @@ The workflow can now be run locally by executing the script, `python echoflow.py
 It is possible to provide input parameters to workflows. Parameters can also be passed to subsequent steps.
 
 ```python
-from argus import Workflow
+from pargo import Workflow
 
 def double(x: int):
     return 2*x
@@ -64,7 +64,7 @@ When the workflow is finished, `x=4`.
 Steps can be executed for each item:
 
 ```python
-from argus import Foreach, Workflow
+from pargo import Foreach, Workflow
 
 def echo_item(item: str):
     print(item)
@@ -78,7 +78,7 @@ def echo_item(item: str):
 This runs in parallel remotely and in sequence locally. To limit the number of pods executed in parallel, `parallelism` can be set for the full Workflow or individual steps:
 
 ```python
-from argus import Foreach, Workflow
+from pargo import Foreach, Workflow
 
 def echo_item(item: str):
     print(item)
@@ -94,7 +94,7 @@ def echo_item(item: str):
 Steps can be executed conditionally
 
 ```python
-from argus import When, Workflow
+from pargo import When, Workflow
 import random
 
 def choice():

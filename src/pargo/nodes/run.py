@@ -14,7 +14,7 @@ def load_and_run(task_name: str, module_name: str):
     module = import_module(module_name)
     func = getattr(module, task_name)
 
-    data = loads(environ.pop("ARGUS_DATA", "{}"))
+    data = loads(environ.pop("PARGO_DATA", "{}"))
     item = load_item()
     sig = signature(func)
     inputs = {k: v for k, v in {**data, **item}.items() if k in sig.parameters}
@@ -23,14 +23,14 @@ def load_and_run(task_name: str, module_name: str):
 
 
 def load_item():
-    item = loads(environ.pop("ARGUS_ITEM", "{}"))
+    item = loads(environ.pop("PARGO_ITEM", "{}"))
     return {k: loads(v) for k, v in item.items()}
 
 
-def argus_path():
-    argus_path = Path(environ.get("ARGUS_DIR", Path.cwd() / ".argus"))
-    argus_path.mkdir(exist_ok=True)
-    return argus_path
+def pargo_path():
+    pargo_path = Path(environ.get("PARGO_DIR", Path.cwd() / ".pargo"))
+    pargo_path.mkdir(exist_ok=True)
+    return pargo_path
 
 
 def run_step(task_name: str, module_name: str, write_data: bool = True):
@@ -43,7 +43,7 @@ def run_step(task_name: str, module_name: str, write_data: bool = True):
     data.update(result)
     logger.info(f"Saving data: {dumps(data)}")
     if write_data:
-        data_path = argus_path() / "data.json"
+        data_path = pargo_path() / "data.json"
         data_path.write_text(dumps(data))
     return data
 
@@ -55,7 +55,7 @@ def run_when(task_name: str, module_name: str):
         raise ValueError(
             f"Condition `{task_name}` must return bool, got {type(result).__name__}"
         )
-    when_path = argus_path() / "when.json"
+    when_path = pargo_path() / "when.json"
     when_path.write_text(dumps(result))
     return result
 
@@ -68,13 +68,13 @@ def run_foreach(task_name: str, module_name: str):
             f"Foreach `{task_name}` must return list, got {type(result).__name__}"
         )
     result = [dumps(r) for r in result]
-    foreach_path = argus_path() / "foreach.json"
+    foreach_path = pargo_path() / "foreach.json"
     foreach_path.write_text(dumps(result))
     return result
 
 
 def merge_foreach():
-    items = loads(environ.pop("ARGUS_DATA", "{}"))
+    items = loads(environ.pop("PARGO_DATA", "{}"))
 
     merged = {}
     for d in items:
@@ -85,5 +85,5 @@ def merge_foreach():
         if all(v == vals[0] for v in vals):
             merged[k] = vals[0]
 
-    data_path = argus_path() / "data.json"
+    data_path = pargo_path() / "data.json"
     data_path.write_text(dumps(merged))

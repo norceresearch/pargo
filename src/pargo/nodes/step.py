@@ -8,7 +8,7 @@ from pydantic import Field
 
 from ..argo_types.workflows import RetryStrategy
 from .node import Node
-from .run import argus_path, run_step
+from .run import pargo_path, run_step
 from .worker_template import worker_template
 
 StepTask = Callable[..., None | dict]
@@ -43,9 +43,9 @@ class StepNode(Node):  # FIXME Rename to Step to be consitent with When, Foreach
 
     def run(self, write_data: bool = True):
         """Run the step locally"""
-        data_path = argus_path() / "data.json"
+        data_path = pargo_path() / "data.json"
         data = loads(data_path.read_text())
-        environ["ARGUS_DATA"] = dumps(data)
+        environ["PARGO_DATA"] = dumps(data)
         result = run_step(
             self.task.__name__, self.task.__module__, write_data=write_data
         )

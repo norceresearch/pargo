@@ -29,7 +29,7 @@ from .argo_types.workflows import (
     WorkflowSpec,
 )
 from .nodes.node import Node
-from .nodes.run import argus_path
+from .nodes.run import pargo_path
 from .nodes.step import StepNode
 from .sensor import Sensor
 from .trigger_condition import Condition
@@ -37,7 +37,7 @@ from .trigger_condition import Condition
 
 class Workflow(BaseModel):
     """
-    Class for creating Argus workflows.
+    Class for creating Pargo workflows.
     """
 
     name: str = Field(
@@ -52,7 +52,7 @@ class Workflow(BaseModel):
         example={"my_int": 3},
     )
     image: str = Field(
-        default="python:3.11",  # FIXME Don't make sense as argus is not in this image
+        default="python:3.11",  # FIXME Don't make sense as Pargo is not in this image
         description="Name of image to pull.",
     )
     image_pull_policy: Literal["Always", "IfNotPresent", "Never", None] = Field(
@@ -118,7 +118,7 @@ class Workflow(BaseModel):
             defaults.update(
                 (k, parameters[k]) for k in defaults.keys() & parameters.keys()
             )
-        data_path = argus_path() / "data.json"
+        data_path = pargo_path() / "data.json"
         data_path.write_text(dumps(defaults))
 
         for step in self._nodes:
