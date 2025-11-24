@@ -7,7 +7,7 @@ from shutil import which
 import pytest
 from pydantic_core._pydantic_core import ValidationError
 
-from pargo import Workflow, Foreach, When#, Workflow
+from pargo import Foreach, When, Workflow
 from pargo.utils import add_item, choice, double, get_items, triple
 
 
