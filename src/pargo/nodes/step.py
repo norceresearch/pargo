@@ -7,6 +7,7 @@ from typing import Any, Callable
 from pydantic import Field
 
 from ..argo_types.workflows import RetryStrategy
+from .import_path import import_path
 from .node import Node
 from .run import pargo_path, run_step
 from .worker_template import worker_template
@@ -41,14 +42,20 @@ class StepNode(Node):  # FIXME Rename to Step to be consitent with When, Foreach
         """Argo friendly name of the task."""
         return self.task.__name__.lower().replace("_", "-")
 
+    @property
+    def task_module(self):
+        """Module of the task."""
+        if self.task.__module__ and self.task.__module__ != "__main__":
+            return self.task.__module__
+        else:
+            return import_path(self.task)
+
     def run(self, write_data: bool = True):
         """Run the step locally"""
         data_path = pargo_path() / "data.json"
         data = loads(data_path.read_text())
         environ["PARGO_DATA"] = dumps(data)
-        result = run_step(
-            self.task.__name__, self.task.__module__, write_data=write_data
-        )
+        result = run_step(self.task_name, self.task_module, write_data=write_data)
         return result
 
     def get_templates(
@@ -62,7 +69,7 @@ class StepNode(Node):  # FIXME Rename to Step to be consitent with When, Foreach
     ):
         """Returns a single item list with the configures ScriptTemplate @private"""
         template_name = f"step-{step_counter}-{self.argo_name}"
-        script_source = f'from {run_step.__module__} import run_step\nrun_step("{self.task_name}", "{self.task.__module__}")'
+        script_source = f'from {run_step.__module__} import run_step\nrun_step("{self.task_name}", "{self.task_module}")'
 
         template = worker_template(
             template_name=template_name,

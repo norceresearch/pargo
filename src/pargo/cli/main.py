@@ -8,7 +8,7 @@ from pargo import Workflow
 def load_workflows(path: Path) -> dict[str, Workflow]:
     """Executes a Python file and returns Workflows."""
 
-    module_globals: dict[str, object] = {}
+    module_globals: dict[str, object] = {"__file__": str(path.resolve())}
     code = path.read_text()
     exec(compile(code, str(path), "exec"), module_globals)
 

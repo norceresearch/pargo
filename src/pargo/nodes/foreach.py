@@ -13,6 +13,7 @@ from ..argo_types.workflows import (
     RetryStrategy,
     Task,
 )
+from .import_path import import_path
 from .node import Node
 from .run import merge_foreach, pargo_path, run_foreach
 from .step import StepNode, StepTask
@@ -54,9 +55,22 @@ class Foreach(Node):
         super().__init__(task=task, item_name=item_name, **kwargs)
 
     @property
+    def task_name(self):
+        """Name of the task."""
+        return self.task.__name__
+
+    @property
     def argo_name(self):
         """Name of the task."""
         return "foreach"
+
+    @property
+    def task_module(self):
+        """Module of the task."""
+        if self.task.__module__ and self.task.__module__ != "__main__":
+            return self.task.__module__
+        else:
+            return import_path(self.task)
 
     def then(self, task: StepTask, **kwargs) -> Foreach:
         """Set the task to execute for each item."""
@@ -73,7 +87,7 @@ class Foreach(Node):
         if callable(self.task):
             data = loads(data_path.read_text())
             environ["PARGO_DATA"] = dumps(data)
-            items = run_foreach(self.task.__name__, self.task.__module__)
+            items = run_foreach(self.task_name, self.task_module)
         elif isinstance(self.task, list):
             items = self.task
 
@@ -108,10 +122,8 @@ class Foreach(Node):
         templates = [self._get_dag(block_name, default_parameters)]
 
         if callable(self.task):
-            foreach_name = (
-                block_name + "-" + self.task.__name__.lower().replace("_", "-")
-            )
-            script_source = f'from {run_foreach.__module__} import run_foreach\nrun_foreach("{self.task.__name__}", "{self.task.__module__}")'
+            foreach_name = block_name + "-" + self.task_name.lower().replace("_", "-")
+            script_source = f'from {run_foreach.__module__} import run_foreach\nrun_foreach("{self.task_name}", "{self.task_module}")'
             template = worker_template(
                 template_name=foreach_name,
                 script_source=script_source,
@@ -190,9 +202,7 @@ class Foreach(Node):
         )
 
         if callable(self.task):
-            foreach_name = (
-                block_name + "-" + self.task.__name__.lower().replace("_", "-")
-            )
+            foreach_name = block_name + "-" + self.task_name.lower().replace("_", "-")
             parameters = [
                 Parameter(
                     name="inputs",
