@@ -12,6 +12,7 @@ from ..argo_types.workflows import (
     StepsTemplate,
     Task,
 )
+from .import_path import import_path
 from .node import Node
 from .run import pargo_path, run_when
 from .step import StepNode, StepTask
@@ -43,9 +44,22 @@ class When(Node):
         super().__init__(task=task, **kwargs)
 
     @property
+    def task_name(self):
+        """Name of the task."""
+        return self.task.__name__
+
+    @property
     def argo_name(self):
         """Name of the task."""
         return "when"
+
+    @property
+    def task_module(self):
+        """Module of the task."""
+        if self.task.__module__ and self.task.__module__ != "__main__":
+            return self.task.__module__
+        else:
+            return import_path(self.task)
 
     def then(self, task: StepTask, **kwargs) -> When:
         """Set the task to exectue when the condition evaluates to True."""
@@ -68,7 +82,7 @@ class When(Node):
         data_path = pargo_path() / "data.json"
         data = loads(data_path.read_text())
         environ["PARGO_DATA"] = dumps(data)
-        result = run_when(self.task.__name__, self.task.__module__)
+        result = run_when(self.task_name, self.task_module)
         if result is True:
             self._then.run()
         if result is False and self._otherwise is not None:
@@ -85,13 +99,13 @@ class When(Node):
     ):
         """Returns a list with the configured templates (StepsTemplate and ScriptTemplates). @private"""
         block_name = f"step-{step_counter}-{self.argo_name}"
-        when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
+        when_name = block_name + "-" + self.task_name.lower().replace("_", "-")
         then_name = block_name + "-then-" + self._then.argo_name
 
         templates = [self._get_steps(block_name, default_parameters)]
 
         # when template
-        script_source = f'from {run_when.__module__} import run_when\nrun_when("{self.task.__name__}", "{self.task.__module__}")'
+        script_source = f'from {run_when.__module__} import run_when\nrun_when("{self.task_name}", "{self.task_module}")'
         template = worker_template(
             template_name=when_name,
             script_source=script_source,
@@ -132,7 +146,7 @@ class When(Node):
         return templates
 
     def _get_steps(self, block_name: str, default_parameters: dict[str, Any]):
-        when_name = block_name + "-" + self.task.__name__.lower().replace("_", "-")
+        when_name = block_name + "-" + self.task_name.lower().replace("_", "-")
         then_name = block_name + "-then-" + self._then.argo_name
         default = ",".join(
             f'"{k}": {{{{workflow.parameters.{k}}}}}' for k in default_parameters
