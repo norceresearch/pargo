@@ -42,14 +42,12 @@ class Workflow(BaseModel):
 
     name: str = Field(
         description="Name of the workflow",
-        example="test-workflow",
         pattern=r"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$",
         max_length=63,
     )
     parameters: dict[str, Any] = Field(
         default={},
         description="Named parameters that are available for the workflow tasks.",
-        example={"my_int": 3},
     )
     image: str = Field(
         default="python:3.11",  # FIXME Don't make sense as Pargo is not in this image
@@ -61,13 +59,11 @@ class Workflow(BaseModel):
     schedules: list[str] | None = Field(
         default=None,
         description="Set scheduled execution. Creates an additional cron-manifest when provided.",
-        example=["0 0 * * *"],
     )
     secrets: list[str] | None = Field(default=None, description="")
     trigger_on: Workflow | Condition | None = Field(
         default=None,
         description="Set triggered execution by providing upstream workflow(s) this workflow depends on. Creates an additional sensor-manifest when provided.",
-        example="trigger_on=workflow1 | workflow2 & workflow3",
     )
     trigger_on_parameters: list[dict[str, Any]] | None = Field(
         default=None,
