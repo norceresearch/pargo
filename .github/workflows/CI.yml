@@ -73,6 +73,7 @@ jobs:
         uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
+          cache: false
 
       - name: Run tests
         run: uv run pytest
