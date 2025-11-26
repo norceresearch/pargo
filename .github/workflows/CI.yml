@@ -115,10 +115,15 @@ jobs:
 
       - name: Upload docs as artifact
         uses: actions/upload-artifact@v4
+        with:
+          path: docs/
+
 
   pages:
+    name: Deploy pages
     needs: docs
     permissions:
+      contents: read
       pages: write
       id-token: write
 
