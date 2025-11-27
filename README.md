@@ -11,7 +11,11 @@ The library is inspired by [`metaflow`](https://github.com/Netflix/metaflow) and
 
 # Installation
 
-Not possible to install yet. Should be available on [github](https://github.com/norceresearch) and PyPI in a while.
+Can be installed from git. Should be available on PyPI soon.
+
+# Documentation
+
+[API Documentation](https://norceresearch.github.io/pargo/pargo.html)
 
 # Basic usage
 
