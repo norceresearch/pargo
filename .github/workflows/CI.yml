@@ -122,10 +122,10 @@ jobs:
           name: github-pages
           path: docs/
 
-
   pages:
     name: Deploy pages
     needs: docs
+    if: github.ref == 'refs/heads/main'
     permissions:
       pages: write
       id-token: write
