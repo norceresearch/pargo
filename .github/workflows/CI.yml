@@ -114,18 +114,18 @@ jobs:
         run: uv sync --frozen
 
       - name: Build docs with pdoc
-        run: uv run pdoc pargo -o docs
+        run: uv run pdoc pargo -o docs --no-search
 
-      - name: Upload docs as artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload docs
+        uses: actions/upload-pages-artifact@v4
         with:
-          name: github-pages
           path: docs/
 
   pages:
     name: Deploy pages
     needs: docs
     if: github.ref == 'refs/heads/main'
+    
     permissions:
       pages: write
       id-token: write
@@ -136,10 +136,6 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - name: Download built documentation
-        uses: actions/download-artifact@v4
-        with:
-          name: github-pages
-      - name: Deploy to GitHub Pages
+      - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
