@@ -3,11 +3,11 @@
 Pargo is a lightweight Python library for creating Argo Workflows. Key features:
 
 - Generate manifests that can be synced to Argo Workflows using GitOps such as Flux or ArgoCD.
-- Generate cron-templates when schedules is provided for scheduled execution.
-- Generate sensor-templates when triggering is provided for triggered execution.
+- Generate cron-templates when `schedules` is provided for scheduled execution.
+- Generate sensor-templates when `trigger_on` is provided for triggered execution.
 - Local execution of individual workflows with pure Python for simple development and debugging
 
-The library is inspired by [`metaflow`](https://github.com/Netflix/metaflow) and the [AWS CDK for defining step functions](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_stepfunctions-readme.html). It provides a simple way of executing python code locally or remotely on Argo Workflows. It is not a library to generate all-purpose Argo manifests using python. Then the [hera project](https://github.com/argoproj-labs/hera) is a much better alternative, for instance to make DAGs that down not run sequentially.
+The library is inspired by [`metaflow`](https://github.com/Netflix/metaflow) and the [AWS CDK for defining step functions](https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_stepfunctions-readme.html). It provides a simple way of executing python code locally or remotely on Argo Workflows. It is not a library to generate all-purpose Argo manifests using python. Then the [hera project](https://github.com/argoproj-labs/hera) is a much better alternative, for instance to make DAGs that don't not run sequentially.
 
 # Installation
 
@@ -35,13 +35,13 @@ The workflow can now be run locally by executing the script, `python echoflow.py
 
 # Parameters
 
-It is possible to provide input parameters to workflows. Parameters can also be passed to subsequent steps.
+It is possible to provide input parameters to workflows. Parameters can also be passed to subsequent steps by letting task functions return a dict with named parameters.
 
 ```python
 from pargo import Workflow
 
 def double(x: int):
-    return 2*x
+    return {"x":2*x}
 
 doubleflow = (
     Workflow.new(
