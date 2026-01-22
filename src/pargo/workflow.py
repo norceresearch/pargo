@@ -173,7 +173,9 @@ class Workflow(BaseModel):
         wf = self.to_argo()
         yaml_str = wf.model_dump(exclude_none=True)
         Path(path / (self.name + ".yaml")).write_text(
-            safe_dump(yaml_str, sort_keys=False)
+            safe_dump(yaml_str, sort_keys=False),
+            encoding="utf-8",
+            newline="\n",
         )
 
         if self.schedules:
@@ -200,7 +202,9 @@ class Workflow(BaseModel):
         )
         yaml_str = wf.model_dump(exclude_none=True)
         Path(path / (self.name + "-cron.yaml")).write_text(
-            safe_dump(yaml_str, sort_keys=False)
+            safe_dump(yaml_str, sort_keys=False),
+            encoding="utf-8",
+            newline="\n",
         )
 
     @staticmethod
