@@ -124,5 +124,7 @@ class Sensor(BaseModel):
         sensor = self.to_argo()
         yaml_str = sensor.model_dump(exclude_none=True)
         Path(path / (self.name + "-sensor.yaml")).write_text(
-            safe_dump(yaml_str, sort_keys=False)
+            safe_dump(yaml_str, sort_keys=False),
+            encoding="utf-8",
+            newline="\n",
         )
