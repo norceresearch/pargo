@@ -63,14 +63,12 @@ class WorkflowGroup(BaseModel):
         for ind, workflows in enumerate(self._workflows):
             step = []
             for workflow in workflows:
-                arguments = (
-                    {
-                        "parameters": [
-                            {"name": k, "value": dumps(v), "default": dumps(v)}
-                            for k, v in workflow.parameters.items()
-                        ]
-                    },
-                )
+                arguments = {
+                    "parameters": [
+                        {"name": k, "value": dumps(v), "default": dumps(v)}
+                        for k, v in workflow.parameters.items()
+                    ]
+                }
                 step.append(
                     Task(
                         name=f"step-{ind}-{workflow.name}",
