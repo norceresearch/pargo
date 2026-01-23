@@ -12,6 +12,7 @@ from .nodes.step import StepNode
 from .nodes.when import When as When
 from .trigger_condition import Condition as Condition
 from .workflow import Workflow as Workflow
+from .workflowgroup import WorkflowGroup
 
 __all__ = [
     "Workflow",
@@ -21,4 +22,5 @@ __all__ = [
     "RetryStrategy",
     "Backoff",
     "Condition",
+    "WorkflowGroup",
 ]

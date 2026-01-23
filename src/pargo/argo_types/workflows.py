@@ -20,12 +20,13 @@ ParameterMap: TypeAlias = dict[str, list[Parameter]] | None
 
 class Task(BaseModel):
     name: str
-    template: str
+    template: str | None = None
     depends: str | None = None
     when: str | None = None
     withItems: list[Any] | str | None = None
     withParam: Any = None
     arguments: ParameterMap = None
+    templateRef: None | TemplateRef = None
 
 
 class StepsTemplate(BaseModel):
