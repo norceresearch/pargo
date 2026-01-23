@@ -65,7 +65,7 @@ class WorkflowGroup(BaseModel):
                 step.append(
                     Task(
                         name=f"step-{ind}-{workflow.name}",
-                        templateRef=TemplateRef(name=workflow.name),
+                        templateRef=TemplateRef(name=workflow.name, template="main"),
                     )
                 )
             steps.steps.append(step)

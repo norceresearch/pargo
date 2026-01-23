@@ -52,6 +52,7 @@ class RetryStrategy(BaseModel):
 
 class TemplateRef(BaseModel):
     name: str
+    template: None | str = None
 
 
 class SecretRef(BaseModel):
