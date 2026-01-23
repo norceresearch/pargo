@@ -60,26 +60,37 @@ class WorkflowGroup(BaseModel):
 
     def to_argo(self):
         steps = StepsTemplate(name="main", steps=[])
+        group_parameters = []
         for ind, workflows in enumerate(self._workflows):
             step = []
             for workflow in workflows:
-                arguments = {
-                    "parameters": [
-                        {"name": k, "value": dumps(v), "default": dumps(v)}
-                        for k, v in workflow.parameters.items()
-                    ]
-                }
+                step_parameters = []
+                for k, v in workflow.parameters.items():
+                    namespaced_name = f"{workflow.name}-{k}"
+                    group_parameters.append(
+                        {
+                            "name": namespaced_name,
+                            "value": dumps(v),
+                        }
+                    )
+                    step_parameters.append(
+                        {
+                            "name": k,
+                            "value": f"{{{{workflow.parameters.{namespaced_name}}}}}",
+                        }
+                    )
                 step.append(
                     Task(
                         name=f"step-{ind}-{workflow.name}",
                         templateRef=TemplateRef(name=workflow.name, template="main"),
-                        arguments=arguments,
+                        arguments={"parameters": step_parameters},
                     )
                 )
             steps.steps.append(step)
 
         spec = WorkflowSpec(
             entrypoint="main",
+            arguments={"parameters": group_parameters} if group_parameters else None,
             templates=[steps],
             parallelism=self.parallelism,
         )
