@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -27,12 +29,15 @@ class WorkflowGroup(BaseModel):
         pattern=r"^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$",
         max_length=63,
     )
-    _workflows: list[list[Workflow]] = []
+
     parallelism: int = Field(
         None,
         description="Maximum number of parallel containers running at the same time",
     )
     pod_metadata: None | PodMetadata = Field(default=None, description="")
+
+    _workflows: list[list[Workflow]] = []
+    _annotations = __annotations__
 
     @classmethod
     def new(cls, name: str, **kwargs) -> Workflow:
@@ -88,4 +93,17 @@ class WorkflowGroup(BaseModel):
             safe_dump(yaml_str, sort_keys=False),
             encoding="utf-8",
             newline="\n",
+        )
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}<name={self.name}>"
+
+    def __str__(self):
+        return self.__repr__()
+
+    def __hash__(self):
+        return hash(
+            getattr(self, attr)
+            for attr in self._annotations
+            if not isinstance(getattr(self, attr), dict)
         )
