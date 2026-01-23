@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from json import dumps
 from pathlib import Path
 
 from pydantic import BaseModel, Field
@@ -72,6 +73,12 @@ class WorkflowGroup(BaseModel):
 
         spec = WorkflowSpec(
             entrypoint="main",
+            arguments={
+                "parameters": [
+                    {"name": k, "value": dumps(v), "default": dumps(v)}
+                    for k, v in self.parameters.items()
+                ]
+            },
             templates=[steps],
             parallelism=self.parallelism,
         )
