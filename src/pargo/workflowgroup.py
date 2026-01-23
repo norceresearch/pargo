@@ -5,6 +5,7 @@ from yaml import safe_dump
 
 from .argo_types.primitives import (
     Metadata,
+    PodMetadata,
     TemplateRef,
 )
 from .argo_types.workflows import (
@@ -31,6 +32,7 @@ class WorkflowGroup(BaseModel):
         None,
         description="Maximum number of parallel containers running at the same time",
     )
+    pod_metadata: None | PodMetadata = Field(default=None, description="")
 
     @classmethod
     def new(cls, name: str, **kwargs) -> Workflow:
