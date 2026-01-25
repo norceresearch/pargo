@@ -27,13 +27,20 @@ def load_item():
     return {k: loads(v) for k, v in item.items()}
 
 
-def pargo_path():
+def pargo_path(workflow_name: str | None = None):
     pargo_path = Path(environ.get("PARGO_DIR", Path.cwd() / ".pargo"))
+    if workflow_name:
+        pargo_path = pargo_path / workflow_name
     pargo_path.mkdir(exist_ok=True)
     return pargo_path
 
 
-def run_step(task_name: str, module_name: str, write_data: bool = True):
+def run_step(
+    task_name: str,
+    module_name: str,
+    write_data: bool = True,
+    workflow_name: str | None = None,
+):
     result, data = load_and_run(task_name, module_name)
     result = {} if result is None else result
     if not isinstance(result, dict):
@@ -41,26 +48,26 @@ def run_step(task_name: str, module_name: str, write_data: bool = True):
             f"Task `{task_name}` must return a dict or None, got {type(result).__name__}"
         )
     data.update(result)
-    logger.info(f"Saving data: {dumps(data)}")
+    logger.info(f"Data passed to next step: {dumps(data)}")
     if write_data:
-        data_path = pargo_path() / "data.json"
+        data_path = pargo_path(workflow_name) / "data.json"
         data_path.write_text(dumps(data))
     return data
 
 
-def run_when(task_name: str, module_name: str):
+def run_when(task_name: str, module_name: str, workflow_name: str | None = None):
     result, _ = load_and_run(task_name, module_name)
 
     if not isinstance(result, bool):
         raise ValueError(
             f"Condition `{task_name}` must return bool, got {type(result).__name__}"
         )
-    when_path = pargo_path() / "when.json"
+    when_path = pargo_path(workflow_name) / "when.json"
     when_path.write_text(dumps(result))
     return result
 
 
-def run_foreach(task_name: str, module_name: str):
+def run_foreach(task_name: str, module_name: str, workflow_name: str | None = None):
     result, _ = load_and_run(task_name, module_name)
 
     if not isinstance(result, list):
@@ -68,12 +75,12 @@ def run_foreach(task_name: str, module_name: str):
             f"Foreach `{task_name}` must return list, got {type(result).__name__}"
         )
     result = [dumps(r) for r in result]
-    foreach_path = pargo_path() / "foreach.json"
+    foreach_path = pargo_path(workflow_name) / "foreach.json"
     foreach_path.write_text(dumps(result))
     return result
 
 
-def merge_foreach():
+def merge_foreach(workflow_name: str | None = None):
     items = loads(environ.pop("PARGO_DATA", "{}"))
 
     merged = {}
@@ -85,5 +92,5 @@ def merge_foreach():
         if all(v == vals[0] for v in vals):
             merged[k] = vals[0]
 
-    data_path = pargo_path() / "data.json"
+    data_path = pargo_path(workflow_name) / "data.json"
     data_path.write_text(dumps(merged))

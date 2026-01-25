@@ -77,16 +77,16 @@ class When(Node):
         self._prev = "otherwise"
         return self
 
-    def run(self):
+    def run(self, workflow_name: str | None = None):
         """Run the When-block locally."""
-        data_path = pargo_path() / "data.json"
+        data_path = pargo_path(workflow_name) / "data.json"
         data = loads(data_path.read_text())
         environ["PARGO_DATA"] = dumps(data)
-        result = run_when(self.task_name, self.task_module)
+        result = run_when(self.task_name, self.task_module, workflow_name)
         if result is True:
-            self._then.run()
+            self._then.run(workflow_name=workflow_name)
         if result is False and self._otherwise is not None:
-            self._otherwise.run()
+            self._otherwise.run(workflow_name=workflow_name)
 
     def get_templates(
         self,

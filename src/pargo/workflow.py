@@ -31,6 +31,7 @@ from .argo_types.workflows import (
 from .nodes.node import Node
 from .nodes.run import pargo_path
 from .nodes.step import StepNode
+from .nodes.workflow import WorkflowNode
 from .sensor import Sensor
 from .trigger_condition import Condition
 
@@ -102,6 +103,10 @@ class Workflow(BaseModel):
         """Add tasks or Nodes to the workflow. Callable tasks are converted to StepNodes."""
         if callable(node):
             node = StepNode(task=node, **kwargs)
+        elif isinstance(node, Workflow):
+            node = WorkflowNode(task=[node])
+        elif isinstance(node, list):
+            node = WorkflowNode(task=node)
         self._nodes.append(node)
         return self
 
@@ -114,11 +119,11 @@ class Workflow(BaseModel):
             defaults.update(
                 (k, parameters[k]) for k in defaults.keys() & parameters.keys()
             )
-        data_path = pargo_path() / "data.json"
+        data_path = pargo_path(self.name) / "data.json"
         data_path.write_text(dumps(defaults))
 
         for step in self._nodes:
-            step.run()
+            step.run(workflow_name=self.name)
         logger.info("Workflow ended")
 
     def to_argo(self):
@@ -252,3 +257,4 @@ class Workflow(BaseModel):
 # Rebuilding the pydantic model after Workflow is defined
 Condition.model_rebuild()
 Sensor.model_rebuild()
+WorkflowNode.model_rebuild()

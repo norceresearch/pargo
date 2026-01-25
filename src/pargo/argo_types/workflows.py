@@ -63,6 +63,23 @@ class ScriptTemplate(BaseModel):
     retryStrategy: RetryStrategy | None = None
 
 
+class Resource(BaseModel):
+    action: Literal["create"] = "create"
+    setOwnerReference: bool = True
+    successCondition: str = "status.phase == Succeeded"
+    failureCondition: str = "status.phase in (Failed, Error)"
+    manifest: str
+
+
+class ResourceTemplate(BaseModel):
+    name: str
+    inputs: ParameterMap = None
+    resource: Resource
+    serviceAccountName: str = "argo-service-account"
+    parallelism: int | None = None
+    retryStrategy: RetryStrategy | None = None
+
+
 class WorkflowSpec(BaseModel):
     workflowTemplateRef: None | TemplateRef = None
     entrypoint: None | str = None

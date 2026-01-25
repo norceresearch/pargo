@@ -50,12 +50,17 @@ class StepNode(Node):  # FIXME Rename to Step to be consitent with When, Foreach
         else:
             return import_path(self.task)
 
-    def run(self, write_data: bool = True):
+    def run(self, write_data: bool = True, workflow_name: str | None = None):
         """Run the step locally"""
-        data_path = pargo_path() / "data.json"
+        data_path = pargo_path(workflow_name) / "data.json"
         data = loads(data_path.read_text())
         environ["PARGO_DATA"] = dumps(data)
-        result = run_step(self.task_name, self.task_module, write_data=write_data)
+        result = run_step(
+            self.task_name,
+            self.task_module,
+            write_data=write_data,
+            workflow_name=workflow_name,
+        )
         return result
 
     def get_templates(

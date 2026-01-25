@@ -36,7 +36,7 @@ def test_cli_run(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", ["pargo", "run", str(wf_path)])
     cli()
 
-    data_path = Path(environ["PARGO_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "testflow" / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 2
 
@@ -48,7 +48,7 @@ def test_cli_run_with_defaults(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", ["pargo", "run", str(wf_path)])
     cli()
 
-    data_path = Path(environ["PARGO_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "testflow" / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 2
     assert data["int_param"] == 5
@@ -85,7 +85,7 @@ def test_cli_run_with_params(monkeypatch, tmp_path):
     )
     cli()
 
-    data_path = Path(environ["PARGO_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "testflow" / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 10
     assert data["int_param"] == 10
@@ -117,10 +117,11 @@ def test_cli_run_with_name(monkeypatch, tmp_path):
 
     monkeypatch.setattr(sys, "argv", ["pargo", "run", str(wf_path)])
     cli()
-    data_path = Path(environ["PARGO_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "second" / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 4
 
+    data_path = Path(environ["PARGO_DIR"]) / "first" / "data.json"
     monkeypatch.setattr(sys, "argv", ["pargo", "run", str(wf_path), "--name", "first"])
     cli()
     data = loads(data_path.read_text())
