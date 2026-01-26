@@ -8,7 +8,7 @@ import pytest
 from pydantic_core._pydantic_core import ValidationError
 
 from pargo import Foreach, When, Workflow
-from pargo.utils import add_item, choice, double, get_items, triple
+from pargo.utils import add_item, choice, double, get_items, triple, void
 
 
 def lint_yaml(tmp_path):
@@ -27,7 +27,7 @@ def test_workflow_run(tmp_path):
     testflow = Workflow.new("testflow", parameters={"x": 2}).next(double).next(triple)
     testflow.run()
 
-    data_path = tmp_path / ".pargo" / "data.json"
+    data_path = tmp_path / ".pargo" / "testflow" / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 12
 
@@ -128,7 +128,7 @@ def test_workflow_duplicate_templates():
     assert argo_testflow.spec.templates[3].name == "step-2-double"
 
     testflow.run()
-    data_path = Path(environ["PARGO_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "testflow" / "data.json"
     result = loads(data_path.read_text())
     assert result["x"] == 8
 
@@ -259,7 +259,7 @@ def test_workflow_complex(tmp_path):
     )
 
     testflow.run()
-    data_path = Path(environ["PARGO_DIR"]) / "data.json"
+    data_path = Path(environ["PARGO_DIR"]) / "testflow" / "data.json"
     result = loads(data_path.read_text())
     assert result["x"] == 12
     assert sorted(result["y"]) == [13, 15, 17]
@@ -269,3 +269,62 @@ def test_workflow_complex(tmp_path):
     assert (tmp_path / "testflow-cron.yaml").exists()
     if which("argo"):
         lint_yaml(tmp_path)
+
+
+def test_workflow_group_run(tmp_path):
+    """Test that Workflow.run runs without error and produce expected output for workflows."""
+    testflow1 = Workflow.new("testflow1", parameters={"x": 1}).next(void)
+    testflow2 = Workflow.new("testflow2", parameters={"x": 2}).next(void)
+
+    groupflow = (
+        Workflow.new("groupflow", parameters={"x": 3})
+        .next(testflow1)
+        .next([testflow1, testflow2])
+        .next([testflow2])
+    )
+    groupflow.run()
+
+    data_path = tmp_path / ".pargo" / "testflow1" / "data.json"
+    data = loads(data_path.read_text())
+    assert data["x"] == 1
+    data_path = tmp_path / ".pargo" / "testflow2" / "data.json"
+    data = loads(data_path.read_text())
+    assert data["x"] == 2
+    data_path = tmp_path / ".pargo" / "groupflow" / "data.json"
+    data = loads(data_path.read_text())
+    assert data["x"] == 3
+
+
+def test_workflow_group_yaml(tmp_path):
+    """Test that Workflow.to_yaml produce a yaml file for workflows"""
+    testflow1 = Workflow.new("testflow1", parameters={"x": 1}).next(void)
+    testflow2 = Workflow.new("testflow2", parameters={"x": 2}).next(void)
+    groupflow = Workflow.new("groupflow").next([testflow1, testflow2])
+
+    yaml_path = tmp_path / "groupflow.yaml"
+    groupflow.to_yaml(path=tmp_path)
+    assert yaml_path.exists()
+    data = yaml_path.read_text()
+    assert "WorkflowTemplate" in data
+    assert "groupflow" in data
+
+    if which("argo"):
+        lint_yaml(tmp_path)
+
+
+def test_workflow_group_run_mixed(tmp_path):
+    """Test that Workflow.run runs without error and produce expected output for tasks and workflows."""
+    testflow1 = Workflow.new("testflow1", parameters={"x": 0}).next(void)
+    testflow2 = Workflow.new("testflow2", parameters={"x": 0}).next(void)
+
+    groupflow = (
+        Workflow.new("groupflow", parameters={"x": 1})
+        .next(double)
+        .next([testflow1, testflow2])
+        .next(double)
+    )
+    groupflow.run()
+
+    data_path = tmp_path / ".pargo" / "groupflow" / "data.json"
+    data = loads(data_path.read_text())
+    assert data["x"] == 4

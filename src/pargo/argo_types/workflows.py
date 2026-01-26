@@ -20,7 +20,7 @@ ParameterMap: TypeAlias = dict[str, list[Parameter]] | None
 
 class Task(BaseModel):
     name: str
-    template: str
+    template: str | None = None
     depends: str | None = None
     when: str | None = None
     withItems: list[Any] | str | None = None
@@ -57,6 +57,23 @@ class ScriptTemplate(BaseModel):
     inputs: ParameterMap = None
     script: Script
     outputs: ParameterMap = None
+    serviceAccountName: str = "argo-service-account"
+    parallelism: int | None = None
+    retryStrategy: RetryStrategy | None = None
+
+
+class Resource(BaseModel):
+    action: Literal["create"] = "create"
+    setOwnerReference: bool = True
+    successCondition: str = "status.phase == Succeeded"
+    failureCondition: str = "status.phase in (Failed, Error)"
+    manifest: str
+
+
+class ResourceTemplate(BaseModel):
+    name: str
+    inputs: ParameterMap = None
+    resource: Resource
     serviceAccountName: str = "argo-service-account"
     parallelism: int | None = None
     retryStrategy: RetryStrategy | None = None

@@ -80,14 +80,14 @@ class Foreach(Node):
         self._prev = "then"
         return self
 
-    def run(self):
+    def run(self, workflow_name: str | None = None):
         """Run the Foreach-block locally"""
         logger.info("Running foreach loop")
-        data_path = pargo_path() / "data.json"
+        data_path = pargo_path(workflow_name) / "data.json"
         if callable(self.task):
             data = loads(data_path.read_text())
             environ["PARGO_DATA"] = dumps(data)
-            items = run_foreach(self.task_name, self.task_module)
+            items = run_foreach(self.task_name, self.task_module, workflow_name)
         elif isinstance(self.task, list):
             items = self.task
 
@@ -95,13 +95,13 @@ class Foreach(Node):
         for i, item in enumerate(items):
             logger.info(f"Processing item {i}: {item}")
             environ["PARGO_ITEM"] = dumps({self.item_name: dumps(item)})
-            result = self._then.run(write_data=False)
+            result = self._then.run(write_data=False, workflow_name=workflow_name)
             results.append(result)
 
         if results:
             data_path.write_text(dumps(results))
             environ["PARGO_DATA"] = dumps(results)
-            merge_foreach()
+            merge_foreach(workflow_name)
 
         logger.info("Foreach loop finished")
 
