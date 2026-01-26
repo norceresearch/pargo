@@ -26,7 +26,6 @@ class Task(BaseModel):
     withItems: list[Any] | str | None = None
     withParam: Any = None
     arguments: ParameterMap = None
-    templateRef: None | TemplateRef = None
 
 
 class StepsTemplate(BaseModel):
