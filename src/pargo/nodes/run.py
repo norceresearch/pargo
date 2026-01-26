@@ -56,7 +56,7 @@ def run_step(
             f"Task `{task_name}` must return a dict or None, got {type(result).__name__}"
         )
     data = deepcopy(data)
-    data.update(data)
+    data.update(result)
     logger.info(f"Data passed to next step: {dumps(data)}")
     if remote:
         data_path = pargo_path() / "data.json"
