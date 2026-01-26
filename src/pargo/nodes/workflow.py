@@ -92,7 +92,7 @@ class WorkflowNode(Node):
                 "parameters": [
                     Parameter(
                         name="outputs",
-                        value="{{inputs.parameters.inputs}}",
+                        valueFrom={"parameter":"{{inputs.parameters.inputs}}"},
                     ),
                 ]
             },
