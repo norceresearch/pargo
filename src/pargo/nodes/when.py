@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from json import dumps, loads
-from os import environ
 from typing import Any, Callable
 
 from pydantic import Field
@@ -14,7 +12,7 @@ from ..argo_types.workflows import (
 )
 from .import_path import import_path
 from .node import Node
-from .run import pargo_path, run_when
+from .run import run_when
 from .step import StepNode, StepTask
 from .worker_template import worker_template
 
@@ -77,16 +75,14 @@ class When(Node):
         self._prev = "otherwise"
         return self
 
-    def run(self, workflow_name: str | None = None):
+    def run(self, data: dict[str, Any]):
         """Run the When-block locally."""
-        data_path = pargo_path(workflow_name) / "data.json"
-        data = loads(data_path.read_text())
-        environ["PARGO_DATA"] = dumps(data)
-        result = run_when(self.task_name, self.task_module, workflow_name)
+        result = run_when(self.task_name, self.task_module, data)
         if result is True:
-            self._then.run(workflow_name=workflow_name)
+            data = self._then.run(data)
         if result is False and self._otherwise is not None:
-            self._otherwise.run(workflow_name=workflow_name)
+            data = self._otherwise.run(data)
+        return data
 
     def get_templates(
         self,

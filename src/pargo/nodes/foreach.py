@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from json import dumps, loads
-from os import environ
+from json import dumps
 from typing import Any, Callable
 
 from loguru import logger
@@ -15,7 +14,7 @@ from ..argo_types.workflows import (
 )
 from .import_path import import_path
 from .node import Node
-from .run import merge_foreach, pargo_path, run_foreach
+from .run import merge_foreach, run_foreach
 from .step import StepNode, StepTask
 from .worker_template import worker_template
 
@@ -80,30 +79,26 @@ class Foreach(Node):
         self._prev = "then"
         return self
 
-    def run(self, workflow_name: str | None = None):
+    def run(self, data: dict[str, Any]):
         """Run the Foreach-block locally"""
         logger.info("Running foreach loop")
-        data_path = pargo_path(workflow_name) / "data.json"
+
         if callable(self.task):
-            data = loads(data_path.read_text())
-            environ["PARGO_DATA"] = dumps(data)
-            items = run_foreach(self.task_name, self.task_module, workflow_name)
+            items = run_foreach(self.task_name, self.task_module, data)
         elif isinstance(self.task, list):
             items = self.task
 
         results = []
         for i, item in enumerate(items):
             logger.info(f"Processing item {i}: {item}")
-            environ["PARGO_ITEM"] = dumps({self.item_name: dumps(item)})
-            result = self._then.run(write_data=False, workflow_name=workflow_name)
+            result = self._then.run(data, {self.item_name: item})
             results.append(result)
 
         if results:
-            data_path.write_text(dumps(results))
-            environ["PARGO_DATA"] = dumps(results)
-            merge_foreach(workflow_name)
+            data = merge_foreach(results)
 
         logger.info("Foreach loop finished")
+        return data
 
     def get_templates(
         self,

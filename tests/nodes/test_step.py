@@ -1,15 +1,13 @@
-from json import dumps
-
 from pargo.nodes.step import StepNode
 from pargo.utils import double
 
 
 def test_stepnode_run(tmp_path):
     """Test that StepNode.run produce the expected output"""
-    (tmp_path / ".pargo" / "data.json").write_text(dumps({"x": 3}))
+    data = {"x": 3}
 
     node = StepNode(task=double)
-    result = node.run(write_data=True)
+    result = node.run(data)
     assert "x" in result
     assert result["x"] == 6
 
