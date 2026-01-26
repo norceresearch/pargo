@@ -34,10 +34,11 @@ class WorkflowNode(Node):
         """Name of the task."""
         return "workflow"
 
-    def run(self, workflow_name: str | None = None):
+    def run(self, data: dict[str, Any]):
         """Run the step locally"""
         for workflow in self.task:
             workflow.run()
+        return data
 
     def get_templates(
         self,

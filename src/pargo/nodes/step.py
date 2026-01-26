@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from json import dumps, loads
-from os import environ
 from typing import Any, Callable
 
 from pydantic import Field
@@ -9,7 +7,7 @@ from pydantic import Field
 from ..argo_types.workflows import RetryStrategy
 from .import_path import import_path
 from .node import Node
-from .run import pargo_path, run_step
+from .run import run_step
 from .worker_template import worker_template
 
 StepTask = Callable[..., None | dict]
@@ -50,16 +48,13 @@ class StepNode(Node):  # FIXME Rename to Step to be consitent with When, Foreach
         else:
             return import_path(self.task)
 
-    def run(self, write_data: bool = True, workflow_name: str | None = None):
+    def run(self, data: dict[str, Any], item: dict[str, Any] = {}):
         """Run the step locally"""
-        data_path = pargo_path(workflow_name) / "data.json"
-        data = loads(data_path.read_text())
-        environ["PARGO_DATA"] = dumps(data)
         result = run_step(
             self.task_name,
             self.task_module,
-            write_data=write_data,
-            workflow_name=workflow_name,
+            data,
+            item,
         )
         return result
 

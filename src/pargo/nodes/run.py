@@ -1,25 +1,30 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from importlib import import_module
 from inspect import signature
 from json import dumps, loads
 from os import environ
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
 
-def load_and_run(task_name: str, module_name: str):
+def run(
+    task_name: str,
+    module_name: str,
+    data: dict[str, Any] | None = None,
+    item: dict[str, Any] = {},
+):
     logger.info(f"Running task {task_name} from {module_name}")
     module = import_module(module_name)
     func = getattr(module, task_name)
 
-    data = loads(environ.pop("PARGO_DATA", "{}"))
-    item = load_item()
     sig = signature(func)
     inputs = {k: v for k, v in {**data, **item}.items() if k in sig.parameters}
     result = func(**inputs)
-    return result, data
+    return result
 
 
 def load_item():
@@ -27,10 +32,8 @@ def load_item():
     return {k: loads(v) for k, v in item.items()}
 
 
-def pargo_path(workflow_name: str | None = None):
+def pargo_path():
     pargo_path = Path(environ.get("PARGO_DIR", Path.cwd() / ".pargo"))
-    if workflow_name:
-        pargo_path = pargo_path / workflow_name
     pargo_path.mkdir(exist_ok=True, parents=True)
     return pargo_path
 
@@ -38,53 +41,71 @@ def pargo_path(workflow_name: str | None = None):
 def run_step(
     task_name: str,
     module_name: str,
-    write_data: bool = True,
-    workflow_name: str | None = None,
+    data: dict[str, Any] | None = None,
+    item: dict[str, Any] = {},
 ):
-    result, data = load_and_run(task_name, module_name)
+    remote = True if data is None else False
+    if remote:
+        data = loads(environ.pop("PARGO_DATA"))
+        item = load_item()
+
+    result = run(task_name, module_name, data, item)
     result = {} if result is None else result
     if not isinstance(result, dict):
         raise ValueError(
             f"Task `{task_name}` must return a dict or None, got {type(result).__name__}"
         )
+    data = deepcopy(data)
     data.update(result)
     logger.info(f"Data passed to next step: {dumps(data)}")
-    if write_data:
-        data_path = pargo_path(workflow_name) / "data.json"
+    if remote:
+        data_path = pargo_path() / "data.json"
         data_path.write_text(dumps(data))
     return data
 
 
-def run_when(task_name: str, module_name: str, workflow_name: str | None = None):
-    result, _ = load_and_run(task_name, module_name)
+def run_when(task_name: str, module_name: str, data: dict[str, Any] | None = None):
+    remote = True if data is None else False
+    if remote:
+        data = loads(environ.pop("PARGO_DATA"))
+    result = run(task_name, module_name, data)
 
     if not isinstance(result, bool):
         raise ValueError(
             f"Condition `{task_name}` must return bool, got {type(result).__name__}"
         )
-    when_path = pargo_path(workflow_name) / "when.json"
-    when_path.write_text(dumps(result))
+
+    if remote:
+        when_path = pargo_path() / "when.json"
+        when_path.write_text(dumps(result))
     return result
 
 
-def run_foreach(task_name: str, module_name: str, workflow_name: str | None = None):
-    result, _ = load_and_run(task_name, module_name)
+def run_foreach(task_name: str, module_name: str, data: dict[str, Any] | None = None):
+    remote = True if data is None else False
+    if remote:
+        data = loads(environ.pop("PARGO_DATA"))
+    result = run(task_name, module_name, data)
 
     if not isinstance(result, list):
         raise ValueError(
             f"Foreach `{task_name}` must return list, got {type(result).__name__}"
         )
-    result = [dumps(r) for r in result]
-    foreach_path = pargo_path(workflow_name) / "foreach.json"
-    foreach_path.write_text(dumps(result))
+
+    if remote:
+        result = [dumps(r) for r in result]
+        foreach_path = pargo_path() / "foreach.json"
+        foreach_path.write_text(dumps(result))
     return result
 
 
-def merge_foreach(workflow_name: str | None = None):
-    items = loads(environ.pop("PARGO_DATA", "{}"))
+def merge_foreach(data: list[dict[str, Any]] | None = None):
+    remote = True if data is None else False
+    if remote:
+        data = loads(environ.pop("PARGO_DATA"))
 
     merged = {}
-    for d in items:
+    for d in data:
         for k, v in d.items():
             merged.setdefault(k, []).append(v)
 
@@ -92,5 +113,7 @@ def merge_foreach(workflow_name: str | None = None):
         if all(v == vals[0] for v in vals):
             merged[k] = vals[0]
 
-    data_path = pargo_path(workflow_name) / "data.json"
-    data_path.write_text(dumps(merged))
+    if remote:
+        data_path = pargo_path() / "data.json"
+        data_path.write_text(dumps(merged))
+    return merged

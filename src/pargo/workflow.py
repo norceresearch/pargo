@@ -99,13 +99,19 @@ class Workflow(BaseModel):
                     "trigger_on_parameters must be same length as number of OR statements when defined."
                 )
 
+    @property
+    def data_path(self):
+        data_path = pargo_path() / self.name
+        data_path.mkdir(exist_ok=True, parents=True)
+        return data_path / "data.json"
+
     def next(self, node: Node | Callable, **kwargs) -> Workflow:
         """Add tasks or Nodes to the workflow. Callable tasks are converted to StepNodes."""
         if callable(node):
             node = StepNode(task=node, **kwargs)
         elif isinstance(node, Workflow):
             node = WorkflowNode(task=[node])
-        elif isinstance(node, list):
+        elif isinstance(node, list) and all(isinstance(w, Workflow) for w in node):
             node = WorkflowNode(task=node)
         self._nodes.append(node)
         return self
@@ -114,16 +120,14 @@ class Workflow(BaseModel):
         """Run the workflow locally."""
         logger.info(f"Workflow {self.name} started")
 
-        defaults = deepcopy(self.parameters)
+        data = deepcopy(self.parameters)
         if parameters:  # Override default parameters
-            defaults.update(
-                (k, parameters[k]) for k in defaults.keys() & parameters.keys()
-            )
-        data_path = pargo_path(self.name) / "data.json"
-        data_path.write_text(dumps(defaults))
+            data.update((k, parameters[k]) for k in data.keys() & parameters.keys())
 
+        self.data_path.write_text(dumps(data))
         for step in self._nodes:
-            step.run(workflow_name=self.name)
+            data = step.run(data)
+            self.data_path.write_text(dumps(data))
         logger.info("Workflow ended")
 
     def to_argo(self):
