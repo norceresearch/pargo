@@ -31,7 +31,7 @@ def pargo_path(workflow_name: str | None = None):
     pargo_path = Path(environ.get("PARGO_DIR", Path.cwd() / ".pargo"))
     if workflow_name:
         pargo_path = pargo_path / workflow_name
-    pargo_path.mkdir(exist_ok=True)
+    pargo_path.mkdir(exist_ok=True, parents=True)
     return pargo_path
 
 
