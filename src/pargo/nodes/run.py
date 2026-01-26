@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from importlib import import_module
 from inspect import signature
 from json import dumps, loads
@@ -54,7 +55,8 @@ def run_step(
         raise ValueError(
             f"Task `{task_name}` must return a dict or None, got {type(result).__name__}"
         )
-    data = {**data, **result}
+    data = deepcopy(data)
+    data.update(data)
     logger.info(f"Data passed to next step: {dumps(data)}")
     if remote:
         data_path = pargo_path() / "data.json"
