@@ -4,6 +4,10 @@ from pathlib import Path
 
 def import_path(func):
     """Get the import path of tasks defined in a running script."""
+
+    # If wrapped we need the source file of the wrapped function,
+    # not the source file of the decorator.
+    func = getattr(func, "__wrapped__", func)
     file = getsourcefile(func)
 
     path = Path(file).resolve()
