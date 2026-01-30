@@ -1,3 +1,5 @@
+import inspect
+import pathlib
 import subprocess
 from json import dumps, loads
 from os import environ
@@ -7,7 +9,9 @@ from shutil import which
 import pytest
 from pydantic_core._pydantic_core import ValidationError
 
+import tests.utils as test_utils
 from pargo import Foreach, When, Workflow
+from pargo.nodes.import_path import import_path
 from pargo.utils import add_item, choice, double, get_items, triple, void
 
 
@@ -328,3 +332,20 @@ def test_workflow_group_run_mixed(tmp_path):
     data_path = tmp_path / ".pargo" / "groupflow" / "data.json"
     data = loads(data_path.read_text())
     assert data["x"] == 4
+
+
+@test_utils.decorator()
+def foo():
+    return {"x": 1}
+
+
+def test_wrapped():
+    # Verify inspect.getsourcefile actually get source file of the decorator
+    # definition file
+    file = inspect.getsourcefile(foo)
+    assert pathlib.Path(file).resolve() != pathlib.Path(__file__).resolve()
+    assert pathlib.Path(file).resolve() == pathlib.Path(test_utils.__file__).resolve()
+
+    # import_path will be this file's path
+    path = import_path(foo)
+    assert path == "tests.test_workflow"
