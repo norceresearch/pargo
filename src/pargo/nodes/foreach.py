@@ -26,12 +26,8 @@ class Foreach(Node):
     Class for executing steps for each item.
     """
 
-    task: ForeachTask | list[Any] = Field(
-        description="Callable that returns a list or a list to iterate over."
-    )
-    item_name: str = Field(
-        default="item",
-        description="Name of the iterating variable. Will be available for the subsequet task.",
+    task: ForeachTask | dict[str,list[Any]] = Field(
+        description="Callable or directly a dict with a list to iterate over."
     )
     image: str | None = Field(
         default=None, description="Overwrite workflow image for the ForeachTask"
@@ -42,7 +38,7 @@ class Foreach(Node):
     retry: int | RetryStrategy | None = Field(
         default=None, description="Overwrite workflow retry for the ForeachTask"
     )
-    _then: StepNode | None = None
+    _then: Node | None = None
     _prev: str = "foreach"
 
     def __init__(
@@ -55,13 +51,13 @@ class Foreach(Node):
 
     @property
     def task_name(self):
-        """Name of the task."""
+        """Name of the foreach-task."""
         return self.task.__name__
 
     @property
     def argo_name(self):
-        """Name of the task."""
-        return "foreach"
+        """Argo-friendly name of the foreach-task."""
+        return self.task_name.lower().replace("_", "-")
 
     @property
     def task_module(self):
@@ -71,27 +67,30 @@ class Foreach(Node):
         else:
             return import_path(self.task)
 
-    def then(self, task: StepTask, **kwargs) -> Foreach:
+    def then(self, node: StepTask | Node, **kwargs) -> Foreach:
         """Set the task to execute for each item."""
         if self._prev != "foreach":
             raise RuntimeError(".then(...) must follow Foreach(...) ")
-        self._then = StepNode(task=task, **kwargs)
+        if callable(node):
+            node = StepNode(task=node, **kwargs)
+        self._then = node
         self._prev = "then"
         return self
 
-    def run(self, data: dict[str, Any]):
+    def run(self, data: dict[str, Any], items: dict[str, Any] = {}):
         """Run the Foreach-block locally"""
         logger.info("Running foreach loop")
 
         if callable(self.task):
-            items = run_foreach(self.task_name, self.task_module, data)
-        elif isinstance(self.task, list):
-            items = self.task
+            collection = run_foreach(self.task_name, self.task_module, data)
+        elif isinstance(self.task, dict):
+            collection = self.task
+        name,elements = next(iter(collection.items()))
 
         results = []
-        for i, item in enumerate(items):
-            logger.info(f"Processing item {i}: {item}")
-            result = self._then.run(data, {self.item_name: item})
+        for i, element in enumerate(elements):
+            logger.info(f"Processing item {i}: {element}")
+            result = self._then.run(data, {**items, name: element})
             results.append(result)
 
         if results:
@@ -108,18 +107,22 @@ class Foreach(Node):
         default_secrets: list[str] | None,
         default_parameters: dict[str, Any],
         default_retry: int | RetryStrategy | None,
+        when_level: int = 0,
+        foreach_level: int = 0,
     ):
         """Returns a list with the configured templates (DAGTemplate and ScriptTemplates). @private"""
-        block_name = f"step-{step_counter}-{self.argo_name}"
-        then_name = block_name + "-" + self._then.argo_name
-        merge_name = block_name + "-merge"
+        block_name = f"step-{step_counter}-foreach-{foreach_level}"
+        foreach_name = None
+        merge_name = f"step-{step_counter}-merge-{foreach_level}"
+        # then_name = block_name + "-" + self._then.argo_name
+        # merge_name = block_name + "-merge"
 
-        templates = [self._get_dag(block_name, default_parameters)]
+        # templates = [self._get_dag(block_name, default_parameters)]
 
         if callable(self.task):
-            foreach_name = block_name + "-" + self.task_name.lower().replace("_", "-")
+            foreach_name = f"step-{step_counter}-{self.argo_name}"
             script_source = f'from {run_foreach.__module__} import run_foreach\nrun_foreach("{self.task_name}", "{self.task_module}")'
-            template = worker_template(
+            foreach_template = worker_template(
                 template_name=foreach_name,
                 script_source=script_source,
                 parameters=default_parameters,
@@ -130,30 +133,29 @@ class Foreach(Node):
                 outpath="/tmp/foreach.json",
                 retry=self.retry or default_retry,
             )
-            templates.append(template)
 
-        template = self._then.get_templates(
+        then_templates = self._then.get_templates(
             step_counter=step_counter,
             default_image=default_image,
             image_pull_policy=image_pull_policy,
             default_secrets=default_secrets,
             default_parameters=default_parameters,
             default_retry=self.retry or default_retry,
+            when_level=when_level,
+            foreach_level=foreach_level + 1,
         )
-        template[0].name = then_name
-        template[0].script.env.append(
+        then_templates[0].script.env.append(
             Parameter(
                 name="PARGO_ITEM",
                 value=f'{{"{self.item_name}": "{{{{inputs.parameters.item}}}}"}}',
             )
         )
-        template[0].inputs["parameters"].append(Parameter(name="item"))
-        templates.extend(template)
+        then_templates[0].inputs["parameters"].append(Parameter(name="item"))
 
         script_source = (
             f"from {merge_foreach.__module__} import merge_foreach\nmerge_foreach()"
         )
-        template = worker_template(
+        merge_template = worker_template(
             template_name=merge_name,
             script_source=script_source,
             parameters=default_parameters,
@@ -164,13 +166,16 @@ class Foreach(Node):
             outpath="/tmp/data.json",
             retry=None,
         )
-        templates.append(template)
+
+        block_template = self._get_dag(block_name,foreach_name,then_templates[0].name,merge_name,default_parameters)
+        if callable(self.task):
+            templates = [block_template,foreach_template,*then_templates,merge_template]
+        else:
+            templates = [block_template,*then_templates,merge_template]
 
         return templates
 
-    def _get_dag(self, block_name: str, default_parameters: dict[str, Any]):
-        then_name = block_name + "-" + self._then.argo_name
-        merge_name = block_name + "-merge"
+    def _get_dag(self, block_name: str, foreach_name:str|None, then_name: str, merge_name: str, default_parameters: dict[str, Any]):
         default = ",".join(
             f'"{k}": {{{{workflow.parameters.{k}}}}}' for k in default_parameters
         )
@@ -197,7 +202,6 @@ class Foreach(Node):
         )
 
         if callable(self.task):
-            foreach_name = block_name + "-" + self.task_name.lower().replace("_", "-")
             parameters = [
                 Parameter(
                     name="inputs",

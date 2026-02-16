@@ -22,9 +22,24 @@ def choice(x: int):
     return x % 3 == 0
 
 
+def true():
+    logger.info("Returning True")
+    return True
+
+
+def false():
+    logger.info("Returning False")
+    return False
+
+
 def get_items():
     logger.info("Getting items for loop")
-    return [1, 2, 3]
+    return {"item":[1, 2, 3]}
+
+
+def get_ys():
+    logger.info("Getting items for loop")
+    return {"y":[1, 2, 3]}
 
 
 def echo_item(item: Any):

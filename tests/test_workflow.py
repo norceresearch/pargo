@@ -255,7 +255,7 @@ def test_workflow_complex(tmp_path):
         .next(double)
         .next(When(choice).then(double).otherwise(triple))
         .next(Foreach(get_items).then(double))
-        .next(Foreach([1, 5, 3], item_name="item").then(add_item))
+        .next(Foreach({"item":[1, 5, 3]}).then(add_item))
     )
 
     testflow.run()

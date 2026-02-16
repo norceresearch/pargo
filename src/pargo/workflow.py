@@ -145,13 +145,13 @@ class Workflow(BaseModel):
                 default_retry=self.retry,
             )
             s = Task(
-                name=f"step-{ind}-{node.argo_name}",
-                template=f"step-{ind}-{node.argo_name}",
+                name=t[0].name,
+                template=t[0].name,
                 arguments=arguments,
             )
             steps.steps.append([s])
             templates.extend(t)
-            arguments = self._next_argument(ind, node.argo_name)
+            arguments = self._next_argument(t[0].name)
 
         spec = WorkflowSpec(
             entrypoint="main",
@@ -217,11 +217,11 @@ class Workflow(BaseModel):
         )
 
     @staticmethod
-    def _next_argument(ind: int, name: str):
+    def _next_argument(name: str):
         parameters = [
             Parameter(
                 name="inputs",
-                value=f"{{{{steps.step-{ind}-{name}.outputs.parameters.outputs}}}}",
+                value=f"{{{{steps.{name}.outputs.parameters.outputs}}}}",
             )
         ]
         return {"parameters": parameters}

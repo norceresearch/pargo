@@ -66,6 +66,8 @@ class StepNode(Node):  # FIXME Rename to Step to be consitent with When, Foreach
         default_secrets: list[str] | None,
         default_parameters: dict[str, Any],
         default_retry: int | RetryStrategy | None,
+        when_level: int = 0,
+        foreach_level: int = 0,
     ):
         """Returns a single item list with the configures ScriptTemplate @private"""
         template_name = f"step-{step_counter}-{self.argo_name}"

@@ -13,7 +13,7 @@ from ..argo_types.workflows import (
 from .import_path import import_path
 from .node import Node
 from .run import run_when
-from .step import StepNode, StepTask
+from .step import StepNode
 from .worker_template import worker_template
 
 WhenTask = Callable[..., bool]
@@ -34,8 +34,8 @@ class When(Node):
     retry: int | RetryStrategy | None = Field(
         default=None, description="Overwrite workflow retry for the WhenTesk"
     )
-    _then: StepNode | None = None
-    _otherwise: StepNode | None = None
+    _then: Node | None = None
+    _otherwise: Node | None = None
     _prev: str = "when"
 
     def __init__(self, task: WhenTask, **kwargs):
@@ -43,13 +43,13 @@ class When(Node):
 
     @property
     def task_name(self):
-        """Name of the task."""
+        """Name of the when-task."""
         return self.task.__name__
 
     @property
     def argo_name(self):
-        """Name of the task."""
-        return "when"
+        """Argo friendly name of the when-task."""
+        return self.task_name.lower().replace("_", "-")
 
     @property
     def task_module(self):
@@ -59,19 +59,23 @@ class When(Node):
         else:
             return import_path(self.task)
 
-    def then(self, task: StepTask, **kwargs) -> When:
+    def then(self, node: Callable | Node, **kwargs) -> When:
         """Set the task to exectue when the condition evaluates to True."""
         if self._prev != "when":
             raise RuntimeError(".then(...) must follow When(...) ")
-        self._then = StepNode(task=task, **kwargs)
+        if callable(node):
+            node = StepNode(task=node, **kwargs)
+        self._then = node
         self._prev = "then"
         return self
 
-    def otherwise(self, task: StepTask, **kwargs) -> When:
+    def otherwise(self, node: Callable | Node, **kwargs) -> When:
         """Set the optional task to execute when the condition evaluates to False."""
         if self._prev != "then":
             raise RuntimeError(".otherwise(...) must follow then(...) ")
-        self._otherwise = StepNode(task=task, **kwargs)
+        if callable(node):
+            node = StepNode(task=node, **kwargs)
+        self._otherwise = node
         self._prev = "otherwise"
         return self
 
@@ -92,18 +96,14 @@ class When(Node):
         default_secrets: list[str] | None,
         default_parameters: dict[str, Any],
         default_retry: int | RetryStrategy | None,
+        when_level: int = 0,
+        foreach_level: int = 0,
     ):
         """Returns a list with the configured templates (StepsTemplate and ScriptTemplates). @private"""
-        block_name = f"step-{step_counter}-{self.argo_name}"
-        when_name = block_name + "-" + self.task_name.lower().replace("_", "-")
-        then_name = block_name + "-then-" + self._then.argo_name
 
-        templates = [self._get_steps(block_name, default_parameters)]
-
-        # when template
         script_source = f'from {run_when.__module__} import run_when\nrun_when("{self.task_name}", "{self.task_module}")'
-        template = worker_template(
-            template_name=when_name,
+        when_template = worker_template(
+            template_name=f"step-{step_counter}-{self.argo_name}",
             script_source=script_source,
             parameters=default_parameters,
             image=self.image or default_image,
@@ -113,37 +113,54 @@ class When(Node):
             outpath="/tmp/when.json",
             retry=self.retry or default_retry,
         )
-        templates.append(template)
 
-        template = self._then.get_templates(
+        then_templates = self._then.get_templates(
             step_counter=step_counter,
             default_image=default_image,
             image_pull_policy=image_pull_policy,
             default_secrets=default_secrets,
             default_parameters=default_parameters,
             default_retry=self.retry or default_retry,
+            when_level=when_level + 1,
+            foreach_level=foreach_level,
         )
-        template[0].name = then_name
-        templates.extend(template)
 
         if self._otherwise is not None:
-            otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
-            template = self._otherwise.get_templates(
+            otherwise_templates = self._otherwise.get_templates(
                 step_counter=step_counter,
                 default_image=default_image,
                 image_pull_policy=image_pull_policy,
                 default_secrets=default_secrets,
                 default_parameters=default_parameters,
                 default_retry=self.retry or default_retry,
+                when_level=when_level + 1,
+                foreach_level=foreach_level,
             )
-            template[0].name = otherwise_name
-            templates.extend(template)
+            otherwise_name = otherwise_templates[0].name
+        else:
+            otherwise_name = None
 
+        block_name = f"step-{step_counter}-when-{when_level}"
+        block_template = self._get_steps(
+            block_name,
+            when_template.name,
+            then_templates[0].name,
+            otherwise_name,
+            default_parameters,
+        )
+        templates = [block_template, when_template, *then_templates]
+        if self._otherwise is not None:
+            templates.extend(otherwise_templates)
         return templates
 
-    def _get_steps(self, block_name: str, default_parameters: dict[str, Any]):
-        when_name = block_name + "-" + self.task_name.lower().replace("_", "-")
-        then_name = block_name + "-then-" + self._then.argo_name
+    def _get_steps(
+        self,
+        block_name: str,
+        when_name: str,
+        then_name: str,
+        otherwise_name: str,
+        default_parameters: dict[str, Any],
+    ):
         default = ",".join(
             f'"{k}": {{{{workflow.parameters.{k}}}}}' for k in default_parameters
         )
@@ -152,7 +169,6 @@ class When(Node):
         if self._otherwise is None:
             expression = f'steps["{when_name}"].outputs.parameters.outputs == "true" ? steps["{then_name}"].outputs.parameters.outputs : inputs.parameters.inputs'
         else:
-            otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
             expression = f'steps["{when_name}"].outputs.parameters.outputs == "true" ? steps["{then_name}"].outputs.parameters.outputs : steps["{otherwise_name}"].outputs.parameters.outputs'
         steps = StepsTemplate(
             name=block_name,

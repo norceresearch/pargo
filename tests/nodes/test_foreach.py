@@ -20,7 +20,7 @@ def test_foreach_with_list(tmp_path):
     """Test that Foreach runs as expected given a list"""
     data = {"x": 5}
 
-    node = Foreach(["a", "b"]).then(double)
+    node = Foreach({"item":["a", "b"]}).then(double)
     result = node.run(data)
 
     assert "x" in result
@@ -32,7 +32,7 @@ def test_foreach_with_item(tmp_path):
     """Test that Foreach runs as expected when using the items in the given list."""
     data = {"x": 5}
 
-    node = Foreach([1, 2]).then(add_item)
+    node = Foreach({"item":[1, 2]}).then(add_item)
     result = node.run(data)
 
     assert "y" in result
@@ -44,7 +44,7 @@ def test_foreach_with_named_item(tmp_path):
     """Test that Foreach runs as expected when using named items in the given list."""
     data = {"x": 1}
 
-    node = Foreach([2, 5], item_name="y").then(add_y)
+    node = Foreach({"y":[2, 5]}).then(add_y)
     result = node.run(data)
 
     assert "y" in result
@@ -57,7 +57,7 @@ def test_foreach_with_empty_item(tmp_path):
     """Test that Foreach skips then for empty list."""
     data = {"x": 5}
 
-    node = Foreach([]).then(add_item)
+    node = Foreach({"item":[]}).then(add_item)
     result = node.run(data)
 
     assert "y" not in result
@@ -76,15 +76,15 @@ def test_foreach_get_templates_function():
         default_retry=2,
     )
 
-    assert templates[0].name == "step-1-foreach"
-    assert templates[1].name == "step-1-foreach-get-items"
-    assert templates[2].name == "step-1-foreach-double"
-    assert templates[3].name == "step-1-foreach-merge"
+    assert templates[0].name == "step-1-foreach-0"
+    assert templates[1].name == "step-1-get-items"
+    assert templates[2].name == "step-1-double"
+    assert templates[3].name == "step-1-merge-0"
 
 
 def test_foreach_get_templates_list():
     """Test that Foreach.get_templates produces the expected structure given a list."""
-    node = Foreach(["a", "b"]).then(double)
+    node = Foreach({"item":["a", "b"]}).then(double)
     templates = node.get_templates(
         step_counter=1,
         default_image="image",
@@ -94,9 +94,9 @@ def test_foreach_get_templates_list():
         default_retry=None,
     )
 
-    assert templates[0].name == "step-1-foreach"
-    assert templates[1].name == "step-1-foreach-double"
-    assert templates[2].name == "step-1-foreach-merge"
+    assert templates[0].name == "step-1-foreach-0"
+    assert templates[1].name == "step-1-double"
+    assert templates[2].name == "step-1-merge-0"
 
 
 def test_foreach_then_twice_raises():
@@ -104,3 +104,15 @@ def test_foreach_then_twice_raises():
     node = Foreach(get_items).then(double)
     with pytest.raises(RuntimeError, match="must follow Foreach"):
         node.then(triple)
+
+
+# def test_foreach_nested_run():
+#     data = {"x": 5}
+
+#     node = Foreach("item":["a", "b"]).then(Foreach(["a", "b"]).then(double))
+#     result = node.run(data)
+
+#     assert "x" in result
+#     assert isinstance(result["x"], int)
+#     assert result["x"] == 10
+#     pass

@@ -48,6 +48,8 @@ class WorkflowNode(Node):
         default_secrets: list[str] | None,
         default_parameters: dict[str, Any],
         default_retry: int | RetryStrategy | None,
+        when_level: int = 0,
+        foreach_level: int = 0,
     ):
         """Returns a list with workflow reference templates @private"""
         block_name = f"step-{step_counter}-{self.argo_name}"

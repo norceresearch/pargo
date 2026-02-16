@@ -15,21 +15,21 @@ def run(
     task_name: str,
     module_name: str,
     data: dict[str, Any] | None = None,
-    item: dict[str, Any] = {},
+    items: dict[str, Any] = {},
 ):
     logger.info(f"Running task {task_name} from {module_name}")
     module = import_module(module_name)
     func = getattr(module, task_name)
 
     sig = signature(func)
-    inputs = {k: v for k, v in {**data, **item}.items() if k in sig.parameters}
+    inputs = {k: v for k, v in {**data, **items}.items() if k in sig.parameters}
     result = func(**inputs)
     return result
 
 
-def load_item():
-    item = loads(environ.pop("PARGO_ITEM", "{}"))
-    return {k: loads(v) for k, v in item.items()}
+def load_items():
+    items = loads(environ.pop("PARGO_ITEM", "{}"))
+    return {k: loads(v) for k, v in items.items()}
 
 
 def pargo_path():
@@ -42,14 +42,14 @@ def run_step(
     task_name: str,
     module_name: str,
     data: dict[str, Any] | None = None,
-    item: dict[str, Any] = {},
+    items: dict[str, Any] = {},
 ):
     remote = True if data is None else False
     if remote:
         data = loads(environ.pop("PARGO_DATA"))
-        item = load_item()
+        items = load_items()
 
-    result = run(task_name, module_name, data, item)
+    result = run(task_name, module_name, data, items)
     result = {} if result is None else result
     if not isinstance(result, dict):
         raise ValueError(
@@ -87,9 +87,9 @@ def run_foreach(task_name: str, module_name: str, data: dict[str, Any] | None = 
         data = loads(environ.pop("PARGO_DATA"))
     result = run(task_name, module_name, data)
 
-    if not isinstance(result, list):
+    if not isinstance(result, dict):
         raise ValueError(
-            f"Foreach `{task_name}` must return list, got {type(result).__name__}"
+            f"Foreach `{task_name}` must return dict, got {type(result).__name__}"
         )
 
     if remote:

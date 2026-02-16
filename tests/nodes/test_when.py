@@ -1,7 +1,7 @@
 import pytest
 
 from pargo import When
-from pargo.utils import choice, double, triple
+from pargo.utils import choice, double, false, triple, true
 
 
 def test_when_branch_then(tmp_path):
@@ -49,10 +49,10 @@ def test_when_get_templates():
         default_retry=None,
     )
 
-    assert templates[0].name == "step-1-when"
-    assert templates[1].name == "step-1-when-choice"
-    assert templates[2].name == "step-1-when-then-double"
-    assert templates[3].name == "step-1-when-otherwise-triple"
+    assert templates[0].name == "step-1-when-0"
+    assert templates[1].name == "step-1-choice"
+    assert templates[2].name == "step-1-double"
+    assert templates[3].name == "step-1-triple"
 
 
 def test_when_otherwise_without_then_raises():
@@ -73,3 +73,21 @@ def test_when_otherwise_twice_raises():
     node = When(choice).then(double).otherwise(triple)
     with pytest.raises(RuntimeError, match="must follow then"):
         node.otherwise(double)
+
+
+def test_when_nested_run():
+    data = {"x": 3}
+
+    node = When(choice).then(When(true).then(double).otherwise(triple))
+    result = node.run(data)
+
+    assert "x" in result
+    assert isinstance(result["x"], int)
+    assert result["x"] == 6
+
+    node = When(choice).then(When(false).then(double).otherwise(triple))
+    result = node.run(data)
+
+    assert "x" in result
+    assert isinstance(result["x"], int)
+    assert result["x"] == 9
