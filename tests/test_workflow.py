@@ -340,7 +340,7 @@ def foo():
 
 
 def test_wrapped():
-    # Verify inspect.getsourcefile actually get source file of the decorator
+    # Verify actually get source file of the decorator
     # definition file
     file = inspect.getsourcefile(foo)
     assert pathlib.Path(file).resolve() != pathlib.Path(__file__).resolve()
@@ -348,4 +348,22 @@ def test_wrapped():
 
     # import_path will be this file's path
     path = import_path(foo)
+    assert path == "tests.test_workflow"
+
+
+@test_utils.decorator()
+@test_utils.decorator()
+def bar():
+    return {"x": 2}
+
+
+def test_nested_wrapped():
+    # Verify get source file of the nested decorator
+    # definition file
+    file = inspect.getsourcefile(bar)
+    assert pathlib.Path(file).resolve() != pathlib.Path(__file__).resolve()
+    assert pathlib.Path(file).resolve() == pathlib.Path(test_utils.__file__).resolve()
+
+    # import_path will be this file's path
+    path = import_path(bar)
     assert path == "tests.test_workflow"
