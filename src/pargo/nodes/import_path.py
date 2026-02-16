@@ -1,4 +1,4 @@
-from inspect import getsourcefile
+from inspect import getsourcefile, unwrap
 from pathlib import Path
 
 
@@ -7,7 +7,7 @@ def import_path(func):
 
     # If wrapped we need the source file of the wrapped function,
     # not the source file of the decorator.
-    func = getattr(func, "__wrapped__", func)
+    func = unwrap(func)
     file = getsourcefile(func)
 
     path = Path(file).resolve()
