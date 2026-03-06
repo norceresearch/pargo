@@ -151,6 +151,26 @@ def test_workflow_schedule(tmp_path):
         lint_yaml(tmp_path)
 
 
+def test_workflow_schedule_parameters(tmp_path):
+    """Test that Workflow.to_yaml produces an additional cron-yaml with parameters"""
+    testflow = Workflow.new(
+        "testflow",
+        parameters={"x": "parameter set in parameter"},
+        schedules=["0 0 0 * *"],
+        schedules_parameters={"x": "parameter set in schedules parameter"},
+    ).next(double)
+
+    yaml_path = tmp_path / "testflow-cron.yaml"
+    testflow.to_yaml(path=tmp_path)
+    assert yaml_path.exists()
+    data = yaml_path.read_text()
+    assert "CronWorkflow" in data
+    assert "testflow" in data
+    assert "parameter set in schedules parameter" in data
+    if which("argo"):
+        lint_yaml(tmp_path)
+
+
 def test_workflow_trigger_on(tmp_path):
     """Test that Workflow.to_yaml produces an additional sensor-yaml"""
     testflow = Workflow.new("testflow").next(double)

@@ -1,16 +1,13 @@
 from __future__ import annotations
 
-from typing import Literal, TypeAlias
+from typing import Literal
 
 from pydantic import BaseModel
 
 from .primitives import (
     Metadata,
-    Parameter,
 )
 from .workflows import WorkflowSpec
-
-ParameterMap: TypeAlias = dict[str, list[Parameter]] | None
 
 
 class CronWorkflowSpec(BaseModel):

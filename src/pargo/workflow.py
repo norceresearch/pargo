@@ -61,6 +61,10 @@ class Workflow(BaseModel):
         default=None,
         description="Set scheduled execution. Creates an additional cron-manifest when provided.",
     )
+    schedules_parameters: dict[str, Any] | None = Field(
+        default=None,
+        description="Input parameters to the workflow when triggered by schedules. Applied to all schedules runs. If None, `parameters` is applied.",
+    )
     secrets: list[str] | None = Field(default=None, description="")
     trigger_on: Workflow | Condition | None = Field(
         default=None,
@@ -200,12 +204,22 @@ class Workflow(BaseModel):
 
     def to_yaml_cron(self, path):  # FIXME write_cron_yaml/manifest?
         """Write manifest for scheduled execution on Argo Workflows."""
+        if self.schedules_parameters:
+            arguments = {
+                "parameters": [
+                    {"name": k, "value": dumps(v)}
+                    for k, v in self.schedules_parameters.items()
+                ]
+            }
+        else:
+            arguments = None
+
         wf = CronWorkflow(
             metadata=Metadata(name=self.name),
             spec=CronWorkflowSpec(
                 schedules=self.schedules,
                 workflowSpec=WorkflowSpec(
-                    workflowTemplateRef=TemplateRef(name=self.name)
+                    workflowTemplateRef=TemplateRef(name=self.name), arguments=arguments
                 ),
             ),
         )
