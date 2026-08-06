@@ -249,6 +249,35 @@ def test_workflow_trigger_on_params(tmp_path):
     )
 
 
+def test_workflow_trigger_resets(tmp_path):
+    """Test that Workflow.to_yaml produces an additional sensor-yaml with resets."""
+    testflow1 = Workflow.new("testflow1").next(double)
+    testflow2 = Workflow.new("testflow2").next(double)
+    triggeredflow = Workflow.new(
+        "triggeredflow",
+        trigger_on=testflow1 | testflow2,
+        trigger_resets=["* * 1 * *", "* * 2 * *"],
+    ).next(double)
+
+    yaml_path = tmp_path / "triggeredflow-sensor.yaml"
+    triggeredflow.to_yaml(path=tmp_path)
+    assert yaml_path.exists()
+    data = yaml_path.read_text()
+    assert "Sensor" in data
+    assert "conditionsReset" in data
+    if which("argo"):
+        lint_yaml(tmp_path)
+
+    # Test consistency
+    yamls = []
+    for _ in range(3):
+        triggeredflow.to_yaml(path=tmp_path)
+        yamls.append((tmp_path / "triggeredflow-sensor.yaml").read_text())
+    assert yamls[0] == yamls[1] == yamls[2], (
+        "Indentical workflows give inconsistent yamls."
+    )
+
+
 def test_workflow_trigger_on_params_error():
     """Test that Workflow.to_yaml fails for incorrect number of parameters."""
     testflow1 = Workflow.new("testflow1").next(double)
