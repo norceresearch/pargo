@@ -28,6 +28,7 @@ class ArgoWorkflow(BaseModel):
 class TriggerTemplate(BaseModel):
     name: str
     conditions: str | None = None
+    conditionsReset: list[ConditionsReset] | None = None
     argoWorkflow: ArgoWorkflow
 
 
@@ -68,3 +69,11 @@ class EventSensor(BaseModel):
     kind: Literal["Sensor"] = "Sensor"
     metadata: Metadata
     spec: EventSpec
+
+
+class ConditionsReset(BaseModel):
+    byTime: ByTime
+
+
+class ByTime(BaseModel):
+    cron: str

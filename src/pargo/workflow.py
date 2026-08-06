@@ -74,6 +74,10 @@ class Workflow(BaseModel):
         default=None,
         description="Input parameters to the workflow when triggered by upstream workflows. Must match the length of `trigger_on`",
     )
+    trigger_resets: list[str] | None = Field(
+        default=None,
+        description="Resets each trigger condition at the given cron. Must match the length of `trigger_on`.",
+    )
     parallelism: int | None = Field(
         default=None,
         description="Maximum number of parallel containers running at the same time. Default (None) uses the maximum set by the service.",
@@ -101,6 +105,12 @@ class Workflow(BaseModel):
             if len(self.trigger_on_parameters) != len(self.trigger_on):
                 raise ValueError(
                     "trigger_on_parameters must be same length as number of OR statements when defined."
+                )
+
+        if self.trigger_resets:
+            if len(self.trigger_resets) != len(self.trigger_on):
+                raise ValueError(
+                    "trigger_resets must be same length as number of OR statements when defined."
                 )
 
     @property
@@ -199,6 +209,7 @@ class Workflow(BaseModel):
                 name=self.name,
                 trigger_on=self.trigger_on,
                 parameters=self.trigger_on_parameters,
+                resets=self.trigger_resets,
             )
             sensor.to_yaml(path=path)
 

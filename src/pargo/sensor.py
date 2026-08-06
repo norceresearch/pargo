@@ -9,6 +9,8 @@ from yaml import safe_dump
 
 from .argo_types.events import (
     ArgoWorkflow,
+    ByTime,
+    ConditionsReset,
     Dependency,
     EventSensor,
     EventSpec,
@@ -30,6 +32,7 @@ class Sensor(BaseModel):
     name: str
     trigger_on: Condition
     parameters: list[dict[str, Any]] | None = None
+    resets: list[str] | None = None
 
     def argo_dependencies(self):
         dependencies = []
@@ -72,15 +75,23 @@ class Sensor(BaseModel):
         else:
             arguments = [None] * len(self.trigger_on)
 
+        if self.resets:
+            conditions_resets = [
+                [ConditionsReset(byTime=ByTime(cron=cron))] for cron in self.resets
+            ]
+        else:
+            conditions_resets = [None] * len(self.trigger_on)
+
         triggers = []
-        for ind, (condition, argument) in enumerate(
-            zip(self.trigger_on.items, arguments)
+        for ind, (condition, argument, conditions_reset) in enumerate(
+            zip(self.trigger_on.items, arguments, conditions_resets)
         ):
             triggers.append(
                 Trigger(
                     template=TriggerTemplate(
                         name=self.name + str(ind),
                         conditions=condition,
+                        conditionsReset=conditions_reset,
                         argoWorkflow=ArgoWorkflow(
                             group="argoproj.io",
                             version="v1alpha1",
