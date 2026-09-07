@@ -149,11 +149,20 @@ class When(Node):
         )
         default = f"{{{default}}}"
 
+        then_outputs = f'steps["{then_name}"].outputs.parameters.outputs'
         if self._otherwise is None:
-            expression = f'steps["{when_name}"].outputs.parameters.outputs == "true" ? steps["{then_name}"].outputs.parameters.outputs : inputs.parameters.inputs'
+            otherwise_outputs = "inputs.parameters.inputs"
         else:
             otherwise_name = block_name + "-otherwise-" + self._otherwise.argo_name
-            expression = f'steps["{when_name}"].outputs.parameters.outputs == "true" ? steps["{then_name}"].outputs.parameters.outputs : steps["{otherwise_name}"].outputs.parameters.outputs'
+            otherwise_outputs = (
+                f'steps["{otherwise_name}"].outputs.parameters.outputs '
+                f"?? inputs.parameters.inputs"
+            )
+        expression = (
+            f'steps["{when_name}"].outputs.parameters.outputs == "true" '
+            f"? ({then_outputs} ?? inputs.parameters.inputs) "
+            f": ({otherwise_outputs})"
+        )
         steps = StepsTemplate(
             name=block_name,
             inputs={"parameters": [Parameter(name="inputs", default=default)]},
@@ -162,7 +171,7 @@ class When(Node):
                 "parameters": [
                     Parameter(
                         name="outputs",
-                        valueFrom={"expression": expression},
+                        valueFrom={"expression": expression, "default": default},
                     ),
                 ]
             },

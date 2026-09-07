@@ -73,3 +73,45 @@ def test_when_otherwise_twice_raises():
     node = When(choice).then(double).otherwise(triple)
     with pytest.raises(RuntimeError, match="must follow then"):
         node.otherwise(double)
+
+
+def test_when_output_expression_tolerates_skipped_branches():
+    """Skipped `then`/`otherwise` steps must fall back, not resolve to nil.
+
+    Argo Workflows 4.0.7 / 3.7.16 made an output expression that evaluates to
+    nil a terminal error unless a fallback is declared. Exactly one of the two
+    branches is always skipped, so both dereferences need one.
+    """
+    node = When(choice).then(double).otherwise(triple)
+    templates = node.get_templates(
+        step_counter=1,
+        default_image="image",
+        image_pull_policy="Always",
+        default_secrets=None,
+        default_parameters=[],
+        default_retry=None,
+    )
+
+    value_from = templates[0].outputs["parameters"][0].valueFrom
+    expression = value_from["expression"]
+
+    assert expression.count("?? inputs.parameters.inputs") == 2
+    assert "default" in value_from
+
+
+def test_when_output_expression_without_otherwise():
+    """Without `otherwise` the false branch passes inputs straight through."""
+    node = When(choice).then(double)
+    templates = node.get_templates(
+        step_counter=1,
+        default_image="image",
+        image_pull_policy="Always",
+        default_secrets=None,
+        default_parameters=[],
+        default_retry=None,
+    )
+
+    value_from = templates[0].outputs["parameters"][0].valueFrom
+
+    assert value_from["expression"].endswith(": (inputs.parameters.inputs)")
+    assert "default" in value_from

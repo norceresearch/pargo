@@ -93,7 +93,10 @@ class WorkflowNode(Node):
                 "parameters": [
                     Parameter(
                         name="outputs",
-                        valueFrom={"expression": "inputs.parameters.inputs"},
+                        valueFrom={
+                            "expression": "inputs.parameters.inputs",
+                            "default": default,
+                        },
                     ),
                 ]
             },
