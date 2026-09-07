@@ -104,3 +104,32 @@ def test_foreach_then_twice_raises():
     node = Foreach(get_items).then(double)
     with pytest.raises(RuntimeError, match="must follow Foreach"):
         node.then(triple)
+
+
+def test_foreach_output_expression_tolerates_omitted_merge():
+    """An empty item list omits `then` and so `merge` too.
+
+    The `status` guard keeps the outputs of an omitted task from being
+    dereferenced at all, which is what Argo Workflows before 4.0.7 / 3.7.16
+    needs; the `??` inside it covers a merge that ran but produced nothing,
+    which is what 4.0.7 and later turn into a terminal error.
+    """
+    node = Foreach(get_items).then(double)
+    templates = node.get_templates(
+        step_counter=1,
+        default_image="image",
+        image_pull_policy="Always",
+        default_secrets=None,
+        default_parameters=[],
+        default_retry=None,
+    )
+
+    value_from = templates[0].outputs["parameters"][0].valueFrom
+
+    assert value_from["expression"] == (
+        'tasks["step-1-foreach-merge"].status == "Succeeded" ? '
+        '(tasks["step-1-foreach-merge"].outputs.parameters.outputs '
+        "?? inputs.parameters.inputs) : "
+        "inputs.parameters.inputs"
+    )
+    assert "default" in value_from

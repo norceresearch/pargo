@@ -178,7 +178,8 @@ class Foreach(Node):
 
         expression = (
             f'tasks["{merge_name}"].status == "Succeeded" ? '
-            f'tasks["{merge_name}"].outputs.parameters.outputs : '
+            f'(tasks["{merge_name}"].outputs.parameters.outputs '
+            f"?? inputs.parameters.inputs) : "
             f"inputs.parameters.inputs"
         )
 
@@ -190,7 +191,7 @@ class Foreach(Node):
                 "parameters": [
                     Parameter(
                         name="outputs",
-                        valueFrom={"expression": expression},
+                        valueFrom={"expression": expression, "default": default},
                     )
                 ]
             },
