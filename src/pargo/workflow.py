@@ -114,12 +114,28 @@ class Workflow(BaseModel):
                 )
 
     @property
+    def trigger_condition(self) -> Condition | None:
+        """
+        trigger_on as it is actually stored.
+
+        The field accepts a bare Workflow for convenience, which
+        model_post_init replaces with a single-item Condition, so a read
+        never yields a Workflow. Reading through here says that in the type
+        instead of leaving every caller to narrow the union itself.
+        """
+        if isinstance(self.trigger_on, Workflow):
+            return Condition(items=[self.trigger_on.name])
+        return self.trigger_on
+
+    @property
     def data_path(self):
         data_path = pargo_path() / self.name
         data_path.mkdir(exist_ok=True, parents=True)
         return data_path / "data.json"
 
-    def next(self, node: Node | Callable, **kwargs) -> Workflow:
+    def next(
+        self, node: Node | Callable | Workflow | list[Workflow], **kwargs
+    ) -> Workflow:
         """Add tasks or Nodes to the workflow. Callable tasks are converted to StepNodes."""
         if callable(node):
             node = StepNode(task=node, **kwargs)
@@ -251,7 +267,7 @@ class Workflow(BaseModel):
         ]
         return {"parameters": parameters}
 
-    def __and__(self, other):
+    def __and__(self, other: Workflow | Condition) -> Condition:
         if isinstance(other, Workflow):
             if self.name == other.name:
                 return Condition(items=[self.name])
@@ -261,7 +277,7 @@ class Workflow(BaseModel):
                 raise ValueError("Invalid: cannot do (A | B) & C")
             return Condition(items=[f"{self.name} && {other.items[0]}"])
 
-    def __or__(self, other):
+    def __or__(self, other: Workflow | Condition) -> Condition:
         if isinstance(other, Workflow):
             if self.name == other.name:
                 return Condition(items=[self.name])

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
@@ -15,7 +16,7 @@ class Condition(BaseModel):
 
     items: list[str]
 
-    def __and__(self, other):
+    def __and__(self, other: Workflow | Condition) -> Condition:
         from .workflow import Workflow
 
         if len(self.items) > 1:
@@ -28,25 +29,25 @@ class Condition(BaseModel):
                 raise ValueError("Invalid: cannot do (A | B) & (C | D)")
             return Condition(items=[self.items[0] + " && " + other.items[0]])
 
-    def __or__(self, other):
+    def __or__(self, other: Workflow | Condition) -> Condition:
         if isinstance(other, Workflow):
             return Condition(items=self.items + [other.name])
         else:
             return Condition(items=self.items + other.items)
 
     @property
-    def names(self):
+    def names(self) -> list[str]:
         seen = set()
         for item in self.items:
             for part in item.split(" && "):
                 seen.add(part)
         return sorted(list(seen))
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         return iter(self.items)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return str(self.items)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.items)
