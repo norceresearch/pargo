@@ -28,8 +28,10 @@ def run(
 
 
 def load_item():
-    item = loads(environ.pop("PARGO_ITEM", "{}"))
-    return {k: loads(v) for k, v in item.items()}
+    item = environ.pop("PARGO_ITEM", None)
+    if item is None:
+        return {}
+    return {loads(environ.pop("PARGO_ITEM_NAME", '"item"')): loads(item)}
 
 
 def pargo_path():
