@@ -139,6 +139,8 @@ def test_foreach_item_env_survives_argo_substitution(monkeypatch):
     """Argo substitutes the raw item JSON into PARGO_ITEM; load_item must parse it back."""
     from json import loads
 
+    from yaml import safe_dump
+
     from pargo.nodes.run import load_item
 
     node = Foreach(["1", "b", 1, {"a": 2}], item_name="y").then(double)
@@ -152,6 +154,9 @@ def test_foreach_item_env_survives_argo_substitution(monkeypatch):
     )
     env = {p.name: p.value for p in templates[1].script.env}
     with_param = loads(node._get_dag("step-1-foreach", []).dag["tasks"][0].withParam)
+
+    # A bare `y` is a bool to Argo's YAML 1.1 parser, so the name must stay quoted.
+    assert safe_dump(env["PARGO_ITEM_NAME"]).strip() == '\'"y"\''
 
     for item, expected in zip(with_param, ["1", "b", 1, {"a": 2}]):
         monkeypatch.setenv("PARGO_ITEM_NAME", env["PARGO_ITEM_NAME"])

@@ -143,7 +143,7 @@ class Foreach(Node):
         template[0].name = then_name
         template[0].script.env.extend(
             [
-                Parameter(name="PARGO_ITEM_NAME", value=self.item_name),
+                Parameter(name="PARGO_ITEM_NAME", value=dumps(self.item_name)),
                 Parameter(name="PARGO_ITEM", value="{{inputs.parameters.item}}"),
             ]
         )

@@ -31,7 +31,7 @@ def load_item():
     item = environ.pop("PARGO_ITEM", None)
     if item is None:
         return {}
-    return {environ.pop("PARGO_ITEM_NAME", "item"): loads(item)}
+    return {loads(environ.pop("PARGO_ITEM_NAME", '"item"')): loads(item)}
 
 
 def pargo_path():
