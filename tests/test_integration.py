@@ -35,12 +35,23 @@ def sh(*args: str, check: bool = True) -> str:
 def templates(tmp_path_factory):
     """Apply every example as a WorkflowTemplate.
 
-    kubectl apply is idempotent, so it is harmless that each xdist worker runs it.
+    Every xdist worker runs this. A client-side apply would race (each worker
+    reads "not found", then all try to create); server-side apply is a single
+    upsert, so concurrent identical applies are fine.
     """
     path = tmp_path_factory.mktemp("manifests")
     for workflow in EXAMPLES:
         workflow.to_yaml(path)
-    sh("kubectl", "apply", "-n", NAMESPACE, "-f", str(path))
+    sh(
+        "kubectl",
+        "apply",
+        "--server-side",
+        "--force-conflicts",
+        "-n",
+        NAMESPACE,
+        "-f",
+        str(path),
+    )
 
 
 def submit(workflow) -> str:
