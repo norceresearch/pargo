@@ -92,11 +92,14 @@ jobs:
     name: Integration (k8s ${{ matrix.k8s }}, argo ${{ matrix.argo }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: tests_frozen
     strategy:
       fail-fast: false
       matrix:
         # Add a row to test another combination. Available k8s versions are the
-        # kindest/node tags; argo notes its supported k8s range in its release notes.
+        # node images listed in the kind release notes (bump the pinned kind
+        # version below to reach newer ones); argo notes its supported k8s range
+        # in its release notes.
         include:
           # Known use case
           - k8s: v1.36.4
@@ -129,6 +132,9 @@ jobs:
         uses: helm/kind-action@v1
         with:
           cluster_name: pargo
+          # Must be the kind release that published the node images above:
+          # kind cannot load images into a node image newer than itself.
+          version: v0.33.0
           node_image: kindest/node:${{ matrix.k8s }}
 
       - name: Build and load pargo image
