@@ -89,11 +89,23 @@ jobs:
         run: uv run pytest
 
   integration:
-    name: Integration (Argo on kind)
+    name: Integration (k8s ${{ matrix.k8s }}, argo ${{ matrix.argo }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Add a row to test another combination. Available k8s versions are the
+        # kindest/node tags; argo notes its supported k8s range in its release notes.
+        include:
+          # Known use case
+          - k8s: v1.36.4
+            argo: v4.1.2
+          # Latest versions
+          - k8s: v1.37.0
+            argo: v4.1.2
     env:
-      ARGO_VERSION: v4.1.2
+      ARGO_VERSION: ${{ matrix.argo }}
       # Drives both the generated manifests and kubectl below. `default` is the
       # service account argo's quick-start already grants the workflow roles to.
       PARGO_NAMESPACE: argo
@@ -117,6 +129,7 @@ jobs:
         uses: helm/kind-action@v1
         with:
           cluster_name: pargo
+          node_image: kindest/node:${{ matrix.k8s }}
 
       - name: Build and load pargo image
         run: |
@@ -142,7 +155,9 @@ jobs:
       - name: Run integration tests
         env:
           PARGO_INTEGRATION: "1"
-        run: uv run pytest tests/test_integration.py -v
+        # -n 3: three workflows in flight at once, which one kind node handles
+        # comfortably even with the foreach examples fanning out.
+        run: uv run pytest tests/test_integration.py -v -n 3
 
       - name: Dump workflow state on failure
         if: failure()

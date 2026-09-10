@@ -33,20 +33,19 @@ def sh(*args: str, check: bool = True) -> str:
 
 @pytest.fixture(scope="module")
 def templates(tmp_path_factory):
-    """Generate every example manifest and apply it as a WorkflowTemplate."""
+    """Apply every example as a WorkflowTemplate.
+
+    kubectl apply is idempotent, so it is harmless that each xdist worker runs it.
+    """
     path = tmp_path_factory.mktemp("manifests")
     for workflow in EXAMPLES:
         workflow.to_yaml(path)
     sh("kubectl", "apply", "-n", NAMESPACE, "-f", str(path))
 
 
-@pytest.mark.parametrize(
-    "workflow,expected",
-    [(w, phase) for w, phase in EXAMPLES.items()],
-    ids=lambda arg: arg.name if hasattr(arg, "name") else str(arg),
-)
-def test_example_runs(templates, workflow, expected):
-    submitted = sh(
+def submit(workflow) -> str:
+    """Submit a workflow from its template, returning the generated name."""
+    out = sh(
         "argo",
         "submit",
         "--from",
@@ -56,7 +55,16 @@ def test_example_runs(templates, workflow, expected):
         "--output",
         "json",
     )
-    name = json.loads(submitted)["metadata"]["name"]
+    return json.loads(out)["metadata"]["name"]
+
+
+@pytest.mark.parametrize(
+    "workflow,expected",
+    list(EXAMPLES.items()),
+    ids=lambda arg: getattr(arg, "name", str(arg)),
+)
+def test_example_runs(templates, workflow, expected):
+    name = submit(workflow)
 
     # argo wait exits non-zero for a failed workflow, which is a valid outcome here,
     # so the phase below is what the test actually asserts on.
