@@ -118,3 +118,14 @@ def echo_when_false():
 ```
 
 In the first step, the task is executed if the choice is `True`. Since no `otherwise` step is provided, nothing is done if the choice is `False` and the wokflow moves to the next step. The second step conditionally executes one of the tasks based on the choice result.
+
+# Configuration
+
+Generated manifests target the `argo-workflows` namespace and the `argo-service-account`
+service account. Override either for your own cluster:
+
+```bash
+PARGO_NAMESPACE=argo PARGO_SERVICE_ACCOUNT=default pargo generate myflow.py
+```
+
+Or set them from Python before generating, e.g. `pargo.config.NAMESPACE = "argo"`.

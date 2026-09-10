@@ -103,7 +103,6 @@ class Sensor(BaseModel):
                                     kind="Workflow",
                                     metadata=Metadata(
                                         generateName=f"{self.name}-",
-                                        namespace="argo-workflows",
                                     ),
                                     spec=WorkflowSpec(
                                         workflowTemplateRef=TemplateRef(name=self.name),
@@ -124,7 +123,7 @@ class Sensor(BaseModel):
             metadata=Metadata(name=self.name),
             spec=EventSpec(
                 eventBusName="argoevents",
-                template=EventTemplate(serviceAccountName="argo-service-account"),
+                template=EventTemplate(),
                 dependencies=self.argo_dependencies(),
                 triggers=self.argo_triggers(),
             ),

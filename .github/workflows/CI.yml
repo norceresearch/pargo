@@ -87,6 +87,64 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
+  integration:
+    name: Integration (Argo on kind)
+    runs-on: ubuntu-latest
+    needs: tests_frozen
+    timeout-minutes: 20
+    env:
+      ARGO_VERSION: v4.1.2
+      # Drives both the generated manifests and kubectl below. `default` is the
+      # service account argo's quick-start already grants the workflow roles to.
+      PARGO_NAMESPACE: argo
+      PARGO_SERVICE_ACCOUNT: default
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Create cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: pargo
+
+      - name: Build and load pargo image
+        run: |
+          docker build -t pargo:test .
+          kind load docker-image pargo:test --name pargo
+
+      - name: Install Argo Workflows
+        run: |
+          kubectl create namespace "$PARGO_NAMESPACE"
+          kubectl apply -n "$PARGO_NAMESPACE" -f "https://github.com/argoproj/argo-workflows/releases/download/${ARGO_VERSION}/quick-start-minimal.yaml"
+          kubectl wait --for=condition=Available --timeout=300s -n "$PARGO_NAMESPACE" deployment --all
+
+      - name: Install argo CLI
+        run: |
+          curl -sSL -o /tmp/argo.gz "https://github.com/argoproj/argo-workflows/releases/download/${ARGO_VERSION}/argo-linux-amd64.gz"
+          gunzip -f /tmp/argo.gz
+          chmod +x /tmp/argo
+          sudo mv /tmp/argo /usr/local/bin/argo
+
+      - name: Run integration tests
+        env:
+          PARGO_INTEGRATION: "1"
+        run: uv run pytest tests/test_integration.py -v
+
+      - name: Dump workflow state on failure
+        if: failure()
+        run: kubectl get workflows,pods -n "$PARGO_NAMESPACE" -o wide
+
   docs:
     name: Build documentation
     runs-on: ubuntu-latest

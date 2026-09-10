@@ -4,6 +4,7 @@ from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, Field
 
+from .. import config
 from .primitives import (
     Metadata,
     Parameter,
@@ -57,7 +58,7 @@ class ScriptTemplate(BaseModel):
     inputs: ParameterMap = None
     script: Script
     outputs: ParameterMap = None
-    serviceAccountName: str = "argo-service-account"
+    serviceAccountName: str = Field(default_factory=lambda: config.SERVICE_ACCOUNT)
     parallelism: int | None = None
     retryStrategy: RetryStrategy | None = None
 
@@ -74,7 +75,7 @@ class ResourceTemplate(BaseModel):
     name: str
     inputs: ParameterMap = None
     resource: Resource
-    serviceAccountName: str = "argo-service-account"
+    serviceAccountName: str = Field(default_factory=lambda: config.SERVICE_ACCOUNT)
     parallelism: int | None = None
     retryStrategy: RetryStrategy | None = None
 

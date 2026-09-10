@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Literal, TypeAlias
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from .. import config
 from .primitives import (
     Metadata,
     Parameter,
@@ -54,7 +55,7 @@ class Dependency(BaseModel):
 
 
 class EventTemplate(BaseModel):
-    serviceAccountName: str
+    serviceAccountName: str = Field(default_factory=lambda: config.SERVICE_ACCOUNT)
 
 
 class EventSpec(BaseModel):
