@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Literal, TypeAlias
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from .. import config
 
 PodMetadata: TypeAlias = dict[Literal["annotations", "labels"], dict[str, str]]
 RetryPolicy: TypeAlias = Literal["Always", "OnFailure", "OnError", "OnTransientError"]
@@ -14,7 +16,7 @@ PodGCStrategy: TypeAlias = Literal[
 class Metadata(BaseModel):
     generateName: str | None = None
     name: str | None = None
-    namespace: str = "argo-workflows"
+    namespace: str = Field(default_factory=lambda: config.NAMESPACE)
 
 
 class Parameter(BaseModel):

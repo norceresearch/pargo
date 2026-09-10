@@ -416,3 +416,18 @@ def test_nested_wrapped():
     # import_path will be this file's path
     path = import_path(bar)
     assert path == "tests.test_workflow"
+
+
+def test_config_overrides(tmp_path, monkeypatch):
+    """Namespace and service account default to the historical values, but are overridable."""
+    from pargo import config
+
+    monkeypatch.setattr(config, "NAMESPACE", "my-namespace")
+    monkeypatch.setattr(config, "SERVICE_ACCOUNT", "my-service-account")
+
+    workflow = Workflow.new(name="configured").next(double)
+    workflow.to_yaml(tmp_path)
+    manifest = (tmp_path / "configured.yaml").read_text()
+
+    assert "namespace: my-namespace" in manifest
+    assert "serviceAccountName: my-service-account" in manifest

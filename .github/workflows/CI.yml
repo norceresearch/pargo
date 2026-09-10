@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,7 +16,6 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v5
@@ -31,14 +31,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen
 
-      - name: Ruff lint
-        run: uv run ruff check
-
-      - name: Ruff format
-        run: uv run ruff format --check
-
-      - name: Ruff import order
-        run: uv run ruff check --select I
+      - name: Run pre-commit
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
   tests_frozen:
     name: Tests (frozen)
@@ -72,7 +66,7 @@ jobs:
           - ubuntu-latest
           - windows-latest
           - macos-latest
-        python-version: 
+        python-version:
           - "3.10"
           - "3.11"
           - "3.12"
@@ -93,6 +87,87 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+  integration:
+    name: Integration (k8s ${{ matrix.k8s }}, argo ${{ matrix.argo }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: tests_frozen
+    strategy:
+      fail-fast: false
+      matrix:
+        # Add a row to test another combination. Available k8s versions are the
+        # node images listed in the kind release notes (bump the pinned kind
+        # version below to reach newer ones); argo notes its supported k8s range
+        # in its release notes.
+        include:
+          # Known use case
+          - k8s: v1.36.4
+            argo: v4.1.2
+          # Latest versions
+          - k8s: v1.37.0
+            argo: v4.1.2
+    env:
+      ARGO_VERSION: ${{ matrix.argo }}
+      # Drives both the generated manifests and kubectl below. `default` is the
+      # service account argo's quick-start already grants the workflow roles to.
+      PARGO_NAMESPACE: argo
+      PARGO_SERVICE_ACCOUNT: default
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Create cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: pargo
+          # Must be the kind release that published the node images above:
+          # kind cannot load images into a node image newer than itself.
+          version: v0.33.0
+          node_image: kindest/node:${{ matrix.k8s }}
+
+      - name: Build and load pargo image
+        run: |
+          docker build -t pargo:test .
+          kind load docker-image pargo:test --name pargo
+
+      - name: Install Argo Workflows
+        run: |
+          kubectl create namespace "$PARGO_NAMESPACE"
+          # Server-side apply: argo's CRDs are larger than the 256KB annotation
+          # limit a client-side apply would try to store on them.
+          kubectl apply --server-side -n "$PARGO_NAMESPACE" -f "https://github.com/argoproj/argo-workflows/releases/download/${ARGO_VERSION}/quick-start-minimal.yaml"
+          kubectl wait --for=condition=Established --timeout=120s crd/workflows.argoproj.io crd/workflowtemplates.argoproj.io
+          kubectl wait --for=condition=Available --timeout=300s -n "$PARGO_NAMESPACE" deployment/workflow-controller
+
+      - name: Install argo CLI
+        run: |
+          curl -sSL -o /tmp/argo.gz "https://github.com/argoproj/argo-workflows/releases/download/${ARGO_VERSION}/argo-linux-amd64.gz"
+          gunzip -f /tmp/argo.gz
+          chmod +x /tmp/argo
+          sudo mv /tmp/argo /usr/local/bin/argo
+
+      - name: Run integration tests
+        env:
+          PARGO_INTEGRATION: "1"
+        # -n 3: three workflows in flight at once, which one kind node handles
+        # comfortably even with the foreach examples fanning out.
+        run: uv run pytest tests/test_integration.py -v -n 3
+
+      - name: Dump workflow state on failure
+        if: failure()
+        run: kubectl get workflows,pods -n "$PARGO_NAMESPACE" -o wide
 
   docs:
     name: Build documentation
@@ -125,7 +200,7 @@ jobs:
     name: Deploy pages
     needs: docs
     if: github.ref == 'refs/heads/main'
-    
+
     permissions:
       pages: write
       id-token: write
