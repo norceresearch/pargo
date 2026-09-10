@@ -141,11 +141,11 @@ class Foreach(Node):
             default_retry=self.retry or default_retry,
         )
         template[0].name = then_name
-        template[0].script.env.append(
-            Parameter(
-                name="PARGO_ITEM",
-                value=f'{{"{self.item_name}": "{{{{inputs.parameters.item}}}}"}}',
-            )
+        template[0].script.env.extend(
+            [
+                Parameter(name="PARGO_ITEM_NAME", value=self.item_name),
+                Parameter(name="PARGO_ITEM", value="{{inputs.parameters.item}}"),
+            ]
         )
         template[0].inputs["parameters"].append(Parameter(name="item"))
         templates.extend(template)

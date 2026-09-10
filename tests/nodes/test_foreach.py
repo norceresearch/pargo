@@ -133,3 +133,29 @@ def test_foreach_output_expression_tolerates_omitted_merge():
         "inputs.parameters.inputs"
     )
     assert "default" in value_from
+
+
+def test_foreach_item_env_survives_argo_substitution(monkeypatch):
+    """Argo substitutes the raw item JSON into PARGO_ITEM; load_item must parse it back."""
+    from json import loads
+
+    from pargo.nodes.run import load_item
+
+    node = Foreach(["1", "b", 1, {"a": 2}], item_name="y").then(double)
+    templates = node.get_templates(
+        step_counter=1,
+        default_image="image",
+        image_pull_policy="Always",
+        default_secrets=None,
+        default_parameters=[],
+        default_retry=None,
+    )
+    env = {p.name: p.value for p in templates[1].script.env}
+    with_param = loads(node._get_dag("step-1-foreach", []).dag["tasks"][0].withParam)
+
+    for item, expected in zip(with_param, ["1", "b", 1, {"a": 2}]):
+        monkeypatch.setenv("PARGO_ITEM_NAME", env["PARGO_ITEM_NAME"])
+        monkeypatch.setenv(
+            "PARGO_ITEM", env["PARGO_ITEM"].replace("{{inputs.parameters.item}}", item)
+        )
+        assert load_item() == {"y": expected}
