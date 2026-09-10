@@ -156,7 +156,7 @@ def test_foreach_item_env_survives_argo_substitution(monkeypatch):
     with_param = loads(node._get_dag("step-1-foreach", []).dag["tasks"][0].withParam)
 
     # A bare `y` is a bool to Argo's YAML 1.1 parser, so the name must stay quoted.
-    assert safe_dump(env["PARGO_ITEM_NAME"]).strip() == '\'"y"\''
+    assert safe_dump(env["PARGO_ITEM_NAME"]).strip() == "'\"y\"'"
 
     for item, expected in zip(with_param, ["1", "b", 1, {"a": 2}]):
         monkeypatch.setenv("PARGO_ITEM_NAME", env["PARGO_ITEM_NAME"])
