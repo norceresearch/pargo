@@ -30,4 +30,7 @@ dev = [
 ]
 
 [tool.ruff]
-exclude = [".venv", "src/mimir/protobuf"]
+exclude = [".venv"]
+
+[tool.ruff.lint]
+extend-select = ["I"]
