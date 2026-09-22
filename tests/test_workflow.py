@@ -365,6 +365,26 @@ def test_workflow_group_yaml(tmp_path):
         lint_yaml(tmp_path)
 
 
+def test_workflow_child_workflows():
+    """Test that child_workflows reports the workflows launched by every stage."""
+    testflow1 = Workflow.new("testflow1").next(void)
+    testflow2 = Workflow.new("testflow2").next(void)
+
+    groupflow = (
+        Workflow.new("groupflow")
+        .next(double)
+        .next([testflow1, testflow2])
+        .next(testflow1)
+    )
+
+    assert [w.name for w in groupflow.child_workflows] == [
+        "testflow1",
+        "testflow2",
+        "testflow1",
+    ]
+    assert Workflow.new("plainflow").next(double).child_workflows == []
+
+
 def test_workflow_group_continue_on_failure(tmp_path):
     """Test that a failing workflow in a group does not stop the parent when allowed to."""
     okflow = Workflow.new("okflow", parameters={"x": 2}).next(void)

@@ -128,6 +128,21 @@ class Workflow(BaseModel):
         return self.trigger_on
 
     @property
+    def child_workflows(self) -> list[Workflow]:
+        """
+        Workflows this one launches as children, across all of its stages.
+
+        Lets callers draw the dependency graph of a fan-out without reaching
+        into the node list, which stays private.
+        """
+        return [
+            workflow
+            for node in self._nodes
+            if isinstance(node, WorkflowNode)
+            for workflow in node.task
+        ]
+
+    @property
     def data_path(self):
         data_path = pargo_path() / self.name
         data_path.mkdir(exist_ok=True, parents=True)
