@@ -44,10 +44,10 @@ class WorkflowNode(Node):
         for workflow in self.task:
             try:
                 workflow.run()
-            except Exception:
+            except Exception as error:
                 if not self.continue_on_failure:
                     raise
-                logger.exception(f"Workflow {workflow.name} failed, continuing")
+                logger.exception(f"Workflow {workflow.name} failed, continuing: {error}")
         return data
 
     def get_templates(
