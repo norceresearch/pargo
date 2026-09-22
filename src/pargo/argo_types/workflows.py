@@ -27,6 +27,7 @@ class Task(BaseModel):
     withItems: list[Any] | str | None = None
     withParam: Any = None
     arguments: ParameterMap = None
+    continueOn: dict[str, bool] | None = None
 
 
 class StepsTemplate(BaseModel):

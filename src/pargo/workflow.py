@@ -140,9 +140,9 @@ class Workflow(BaseModel):
         if callable(node):
             node = StepNode(task=node, **kwargs)
         elif isinstance(node, Workflow):
-            node = WorkflowNode(task=[node])
+            node = WorkflowNode(task=[node], **kwargs)
         elif isinstance(node, list) and all(isinstance(w, Workflow) for w in node):
-            node = WorkflowNode(task=node)
+            node = WorkflowNode(task=node, **kwargs)
         self._nodes.append(node)
         return self
 

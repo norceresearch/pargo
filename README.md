@@ -119,6 +119,35 @@ def echo_when_false():
 
 In the first step, the task is executed if the choice is `True`. Since no `otherwise` step is provided, nothing is done if the choice is `False` and the wokflow moves to the next step. The second step conditionally executes one of the tasks based on the choice result.
 
+# Sub-workflows
+
+A step can launch other workflows instead of a python task. A list of workflows
+runs in parallel:
+
+```python
+from pargo import Workflow
+
+(
+    Workflow.new(name="groupflow", parallelism=3) # At most three children at a time
+    .next([collect_a, collect_b, collect_c])
+    .next(process)
+)
+```
+
+By default a failing child fails the parent, so `process` never runs. Set
+`continue_on_failure` when the downstream steps should run on whatever data did
+arrive:
+
+```python
+(
+    Workflow.new(name="groupflow", parallelism=3)
+    .next([collect_a, collect_b, collect_c], continue_on_failure=True)
+    .next(process)
+)
+```
+
+This maps to `continueOn: {failed: true}` on each child step.
+
 # Configuration
 
 Generated manifests target the `argo-workflows` namespace and the `argo-service-account`

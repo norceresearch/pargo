@@ -39,3 +39,8 @@ def add_item(item: int, x: int):
 def add_y(x: int, y: int):
     logger.info("Adding y to x, save as y")
     return {"y": x + y}
+
+
+def boom():
+    logger.info("Raising on purpose")
+    raise RuntimeError("boom")

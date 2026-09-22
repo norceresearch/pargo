@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from loguru import logger
 from pydantic import Field
 from yaml import dump
 
@@ -28,6 +29,10 @@ class WorkflowNode(Node):
     """Class for launching other workflows."""
 
     task: WorkflowTask = Field(description="Workflow to trigger")
+    continue_on_failure: bool = Field(
+        default=False,
+        description="Keep going when a triggered workflow fails, instead of failing this workflow.",
+    )
 
     @property
     def argo_name(self):
@@ -37,7 +42,12 @@ class WorkflowNode(Node):
     def run(self, data: dict[str, Any]):
         """Run the step locally"""
         for workflow in self.task:
-            workflow.run()
+            try:
+                workflow.run()
+            except Exception:
+                if not self.continue_on_failure:
+                    raise
+                logger.exception(f"Workflow {workflow.name} failed, continuing")
         return data
 
     def get_templates(
@@ -78,7 +88,13 @@ class WorkflowNode(Node):
         parallel_steps = []
         for workflow in self.task:
             name = block_name + "-" + workflow.name
-            parallel_steps.append(Task(name=name, template=name))
+            parallel_steps.append(
+                Task(
+                    name=name,
+                    template=name,
+                    continueOn={"failed": True} if self.continue_on_failure else None,
+                )
+            )
 
         default = ",".join(
             f'"{k}": {{{{workflow.parameters.{k}}}}}' for k in default_parameters
