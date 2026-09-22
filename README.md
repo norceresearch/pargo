@@ -146,7 +146,10 @@ arrive:
 )
 ```
 
-This maps to `continueOn: {failed: true}` on each child step.
+This maps to `continueOn: {failed: true}` on each child step. The failed child
+still shows as failed, both in the parent's step and on its own `Workflow`, but the
+parent itself ends up `Succeeded`. Argo has no way to keep the parent `Failed` while
+still running the steps after it (argoproj/argo-workflows#12530).
 
 # Configuration
 

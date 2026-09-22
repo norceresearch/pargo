@@ -88,6 +88,19 @@ failureflow = Workflow.new(
 ).next(divide_by_zero)
 
 
+fanoutflow = (
+    Workflow.new(
+        name="pargo-example-fanout",
+        parameters={"x": 1},
+        image=IMAGE,
+        image_pull_policy=PULL_POLICY,
+        parallelism=2,
+    )
+    .next([failureflow, basicflow], continue_on_failure=True)
+    .next(double)
+)
+
+
 #: Every example, with the workflow phase Argo should end up in.
 EXAMPLES = {
     basicflow: "Succeeded",
@@ -95,6 +108,9 @@ EXAMPLES = {
     foreachflow: "Succeeded",
     advancedflow: "Succeeded",
     failureflow: "Failed",
+    # continueOn keeps the parent Succeeded even though its failureflow child failed,
+    # which is what makes the downstream `double` step run at all.
+    fanoutflow: "Succeeded",
 }
 
 
