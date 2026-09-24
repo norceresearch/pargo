@@ -65,6 +65,10 @@ class Workflow(BaseModel):
         default=None,
         description="Input parameters to the workflow when triggered by schedules. Applied to all schedules runs. If None, `parameters` is applied.",
     )
+    timezone: str | None = Field(
+        default=None,
+        description="IANA timezone `schedules` are evaluated in, e.g. `Europe/Oslo`. If None, the Argo controller's local time is used.",
+    )
     secrets: list[str] | None = Field(default=None, description="")
     trigger_on: Workflow | Condition | None = Field(
         default=None,
@@ -260,6 +264,7 @@ class Workflow(BaseModel):
             metadata=Metadata(name=self.name),
             spec=CronWorkflowSpec(
                 schedules=self.schedules,
+                timezone=self.timezone,
                 workflowSpec=WorkflowSpec(
                     workflowTemplateRef=TemplateRef(name=self.name), arguments=arguments
                 ),

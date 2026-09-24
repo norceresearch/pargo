@@ -171,6 +171,19 @@ def test_workflow_schedule_parameters(tmp_path):
         lint_yaml(tmp_path)
 
 
+def test_workflow_schedule_timezone(tmp_path):
+    """Test that Workflow.to_yaml sets the cron timezone when provided"""
+    testflow = Workflow.new(
+        "testflow", schedules=["0 0 0 * *"], timezone="Europe/Oslo"
+    ).next(double)
+
+    testflow.to_yaml(path=tmp_path)
+    data = (tmp_path / "testflow-cron.yaml").read_text()
+    assert "timezone: Europe/Oslo" in data
+    if which("argo"):
+        lint_yaml(tmp_path)
+
+
 def test_workflow_trigger_on(tmp_path):
     """Test that Workflow.to_yaml produces an additional sensor-yaml"""
     testflow = Workflow.new("testflow").next(double)
