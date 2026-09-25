@@ -148,6 +148,11 @@ jobs:
           # Server-side apply: argo's CRDs are larger than the 256KB annotation
           # limit a client-side apply would try to store on them.
           kubectl apply --server-side -n "$PARGO_NAMESPACE" -f "https://github.com/argoproj/argo-workflows/releases/download/${ARGO_VERSION}/quick-start-minimal.yaml"
+          # The quick-start archives every pod's logs to its bundled minio, whose image
+          # quay.io no longer serves (401), so every step errors. pargo uses no artifacts:
+          # drop both the default artifact repository and the controller-level one.
+          kubectl annotate configmap artifact-repositories -n "$PARGO_NAMESPACE" workflows.argoproj.io/default-artifact-repository-
+          kubectl patch configmap workflow-controller-configmap -n "$PARGO_NAMESPACE" --type json -p '[{"op":"remove","path":"/data/artifactRepository"}]'
           kubectl wait --for=condition=Established --timeout=120s crd/workflows.argoproj.io crd/workflowtemplates.argoproj.io
           kubectl wait --for=condition=Available --timeout=300s -n "$PARGO_NAMESPACE" deployment/workflow-controller
           # Memoization stores its cache in a ConfigMap the controller creates and
