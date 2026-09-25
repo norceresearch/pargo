@@ -150,6 +150,10 @@ jobs:
           kubectl apply --server-side -n "$PARGO_NAMESPACE" -f "https://github.com/argoproj/argo-workflows/releases/download/${ARGO_VERSION}/quick-start-minimal.yaml"
           kubectl wait --for=condition=Established --timeout=120s crd/workflows.argoproj.io crd/workflowtemplates.argoproj.io
           kubectl wait --for=condition=Available --timeout=300s -n "$PARGO_NAMESPACE" deployment/workflow-controller
+          # Memoization stores its cache in a ConfigMap the controller creates and
+          # updates, which the quick-start controller role does not allow.
+          kubectl create role pargo-memoize -n "$PARGO_NAMESPACE" --verb=create,update --resource=configmaps
+          kubectl create rolebinding pargo-memoize -n "$PARGO_NAMESPACE" --role=pargo-memoize --serviceaccount="$PARGO_NAMESPACE:argo"
 
       - name: Install argo CLI
         run: |

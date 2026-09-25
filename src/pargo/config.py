@@ -11,3 +11,6 @@ NAMESPACE = environ.get("PARGO_NAMESPACE", "argo-workflows")
 
 #: Service account the workflow pods and sensors run as.
 SERVICE_ACCOUNT = environ.get("PARGO_SERVICE_ACCOUNT", "argo-service-account")
+
+#: ConfigMap Argo stores memoized child workflow results in.
+MEMOIZE_CONFIGMAP = environ.get("PARGO_MEMOIZE_CONFIGMAP", "pargo-memoize")

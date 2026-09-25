@@ -90,6 +90,11 @@ class Workflow(BaseModel):
     retry: int | RetryStrategy | None = Field(
         default=2, description="Set the number of retries or the full retry strategy."
     )
+    memoize: str | None = Field(
+        default=None,
+        pattern=r"^(\d+(\.\d+)?(ns|us|µs|ms|s|m|h))+$",
+        description="Max age, e.g. `20h`, of a successful run that a parent launching this workflow as a child reuses instead of running it again. Concurrent parents wait on each other rather than both running it. Has no effect on standalone or local runs.",
+    )
     _nodes: list[Node] = []
 
     _annotations = __annotations__

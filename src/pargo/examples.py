@@ -101,6 +101,25 @@ fanoutflow = (
 )
 
 
+memochild = Workflow.new(
+    name="pargo-example-memo-child",
+    parameters={"x": 1},
+    image=IMAGE,
+    image_pull_policy=PULL_POLICY,
+    memoize="1h",
+).next(double)
+
+
+memoflows = [
+    Workflow.new(
+        name=f"pargo-example-memo-{suffix}",
+        image=IMAGE,
+        image_pull_policy=PULL_POLICY,
+    ).next(memochild)
+    for suffix in ("a", "b")
+]
+
+
 #: Every example, with the workflow phase Argo should end up in.
 EXAMPLES = {
     basicflow: "Succeeded",
@@ -111,6 +130,8 @@ EXAMPLES = {
     # continueOn keeps the parent Succeeded even though its failureflow child failed,
     # which is what makes the downstream `double` step run at all.
     fanoutflow: "Succeeded",
+    memochild: "Succeeded",
+    **{flow: "Succeeded" for flow in memoflows},
 }
 
 

@@ -12,7 +12,7 @@ from os import environ
 import pytest
 
 from pargo.config import NAMESPACE
-from pargo.examples import EXAMPLES
+from pargo.examples import EXAMPLES, memochild, memoflows
 
 TIMEOUT = int(environ.get("PARGO_TIMEOUT", 600))
 
@@ -92,3 +92,25 @@ def test_example_runs(templates, workflow, expected):
         "jsonpath={.status.phase}",
     )
     assert phase == expected, sh("argo", "get", name, "-n", NAMESPACE, check=False)
+
+
+def test_memoized_child_runs_once(templates):
+    """Two parents submitted together share one run of their memoized child."""
+    names = [submit(flow) for flow in memoflows]
+    hits = []
+    for name in names:
+        sh("argo", "wait", name, "-n", NAMESPACE, check=False)
+        wf = json.loads(
+            sh("kubectl", "get", "workflow", name, "-n", NAMESPACE, "-o", "json")
+        )
+        assert wf["status"]["phase"] == "Succeeded", sh(
+            "argo", "get", name, "-n", NAMESPACE, check=False
+        )
+        (node,) = [
+            n
+            for n in wf["status"]["nodes"].values()
+            if n.get("templateName") == f"step-0-workflow-{memochild.name}"
+        ]
+        hits.append(node["memoizationStatus"]["hit"])
+
+    assert any(hits)

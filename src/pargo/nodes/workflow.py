@@ -6,6 +6,7 @@ from loguru import logger
 from pydantic import Field
 from yaml import dump
 
+from .. import config
 from ..argo_types.primitives import Metadata, TemplateRef
 from ..argo_types.workflows import (
     Parameter,
@@ -82,6 +83,13 @@ class WorkflowNode(Node):
                 name=template_name,
                 resource=resource,
             )
+            if workflow.memoize:
+                template.memoize = {
+                    "key": workflow.name,
+                    "maxAge": workflow.memoize,
+                    "cache": {"configMap": {"name": config.MEMOIZE_CONFIGMAP}},
+                }
+                template.synchronization = {"mutexes": [{"name": workflow.name}]}
             templates.append(template)
 
         return templates

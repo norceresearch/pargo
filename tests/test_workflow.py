@@ -442,6 +442,31 @@ def test_workflow_group_continue_on_failure_yaml(tmp_path):
         lint_yaml(tmp_path)
 
 
+def test_workflow_group_memoize_yaml(tmp_path):
+    """Test that a memoized child is cached by name and locked against concurrent parents."""
+    memoflow = Workflow.new("memoflow", memoize="20h").next(void)
+    plainflow = Workflow.new("plainflow").next(void)
+    groupflow = Workflow.new("groupflow").next([memoflow, plainflow])
+
+    templates = {t.name: t for t in groupflow.to_argo().spec.templates}
+    memo = templates["step-0-workflow-memoflow"]
+    assert memo.memoize == {
+        "key": "memoflow",
+        "maxAge": "20h",
+        "cache": {"configMap": {"name": "pargo-memoize"}},
+    }
+    assert memo.synchronization == {"mutexes": [{"name": "memoflow"}]}
+    assert templates["step-0-workflow-plainflow"].memoize is None
+    assert templates["step-0-workflow-plainflow"].synchronization is None
+
+    with pytest.raises(ValidationError):
+        Workflow.new("badflow", memoize="1 day")
+
+    groupflow.to_yaml(path=tmp_path)
+    if which("argo"):
+        lint_yaml(tmp_path)
+
+
 def test_workflow_group_run_mixed(tmp_path):
     """Test that Workflow.run runs without error and produce expected output for tasks and workflows."""
     testflow1 = Workflow.new("testflow1", parameters={"x": 0}).next(void)

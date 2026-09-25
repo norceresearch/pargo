@@ -151,6 +151,28 @@ still shows as failed, both in the parent's step and on its own `Workflow`, but 
 parent itself ends up `Succeeded`. Argo has no way to keep the parent `Failed` while
 still running the steps after it (argoproj/argo-workflows#12530).
 
+# Memoization
+
+When several parents share a child, set `memoize` on the child so it runs once per
+window rather than once per parent:
+
+```python
+collect_a = Workflow.new(name="collect-a", memoize="20h").next(download)
+
+Workflow.new(name="report-x").next([collect_a, collect_b]).next(report_x)
+Workflow.new(name="report-y").next([collect_a, collect_c]).next(report_y)
+```
+
+A parent that finds a successful run of `collect-a` younger than 20 hours reuses it
+instead of launching a new one. Parents that start at the same time queue on a mutex
+named after the child, so the second one reuses the run the first one made. Failed
+runs are not cached. Standalone and local runs neither read nor write the cache.
+
+Argo keeps the cache in a ConfigMap (`pargo-memoize`, override with
+`PARGO_MEMOIZE_CONFIGMAP`) and creates it on first use, so the workflow controller
+needs `create` and `update` on configmaps in the workflow namespace. In the Helm
+chart that is `controller.rbac.writeConfigMaps: true`.
+
 # Configuration
 
 Generated manifests target the `argo-workflows` namespace and the `argo-service-account`
