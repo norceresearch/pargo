@@ -17,6 +17,7 @@ class Metadata(BaseModel):
     generateName: str | None = None
     name: str | None = None
     namespace: str = Field(default_factory=lambda: config.NAMESPACE)
+    labels: dict[str, str] | None = None
 
 
 class Parameter(BaseModel):

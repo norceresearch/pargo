@@ -87,6 +87,10 @@ class Workflow(BaseModel):
         description="Maximum number of parallel containers running at the same time. Default (None) uses the maximum set by the service.",
     )
     pod_metadata: None | PodMetadata = Field(default=None, description="")
+    labels: dict[str, str] | None = Field(
+        default=None,
+        description="Labels on the WorkflowTemplate and on every Workflow run from it, however it was started.",
+    )
     retry: int | RetryStrategy | None = Field(
         default=2, description="Set the number of retries or the full retry strategy."
     )
@@ -220,11 +224,12 @@ class Workflow(BaseModel):
             podGC=PodGC(),
             parallelism=self.parallelism,
             podMetadata=self.pod_metadata,
+            workflowMetadata={"labels": self.labels} if self.labels else None,
         )
 
         wf = WorkflowResource(
             kind="WorkflowTemplate",
-            metadata=Metadata(name=self.name),
+            metadata=Metadata(name=self.name, labels=self.labels),
             spec=spec,
         )
         return wf

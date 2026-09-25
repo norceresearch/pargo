@@ -442,6 +442,17 @@ def test_workflow_group_continue_on_failure_yaml(tmp_path):
         lint_yaml(tmp_path)
 
 
+def test_workflow_labels():
+    """Test that labels land on the template and on the Workflows run from it."""
+    labelled = Workflow.new("labelflow", labels={"team": "data"}).next(void).to_argo()
+    assert labelled.metadata.labels == {"team": "data"}
+    assert labelled.spec.workflowMetadata == {"labels": {"team": "data"}}
+
+    plain = Workflow.new("plainflow").next(void).to_argo()
+    assert plain.metadata.labels is None
+    assert plain.spec.workflowMetadata is None
+
+
 def test_workflow_group_memoize_yaml(tmp_path):
     """Test that a memoized child is cached by name and locked against concurrent parents."""
     memoflow = Workflow.new("memoflow", memoize="20h").next(void)

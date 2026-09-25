@@ -173,6 +173,16 @@ Argo keeps the cache in a ConfigMap (`pargo-memoize`, override with
 needs `create` and `update` on configmaps in the workflow namespace. In the Helm
 chart that is `controller.rbac.writeConfigMaps: true`.
 
+# Labels
+
+`labels` go on the WorkflowTemplate and, through `workflowMetadata`, on every
+Workflow run from it, whether by cron, sensor, parent or a manual submit. That makes
+them usable as filters in the Argo UI:
+
+```python
+Workflow.new(name="report-x", labels={"kind": "report"})
+```
+
 # Configuration
 
 Generated manifests target the `argo-workflows` namespace and the `argo-service-account`

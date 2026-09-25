@@ -92,6 +92,7 @@ class WorkflowSpec(BaseModel):
     podGC: PodGC | None = None
     parallelism: int | None = None
     podMetadata: None | PodMetadata = None
+    workflowMetadata: dict[str, Any] | None = None
 
 
 class WorkflowResource(BaseModel):
