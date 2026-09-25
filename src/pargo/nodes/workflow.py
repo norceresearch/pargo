@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from typing import TYPE_CHECKING, Any
 
 from loguru import logger
@@ -84,8 +85,11 @@ class WorkflowNode(Node):
                 resource=resource,
             )
             if workflow.memoize:
+                # ponytail: hashes the spec only, so a task code change behind the same
+                # image tag still hits the old cache; bump the image tag to bust it.
+                spec = workflow.to_argo().spec.model_dump_json(exclude_none=True)
                 template.memoize = {
-                    "key": workflow.name,
+                    "key": f"{workflow.name}-{sha256(spec.encode()).hexdigest()[:12]}",
                     "maxAge": workflow.memoize,
                     "cache": {"configMap": {"name": config.MEMOIZE_CONFIGMAP}},
                 }

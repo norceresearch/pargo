@@ -450,11 +450,17 @@ def test_workflow_group_memoize_yaml(tmp_path):
 
     templates = {t.name: t for t in groupflow.to_argo().spec.templates}
     memo = templates["step-0-workflow-memoflow"]
-    assert memo.memoize == {
-        "key": "memoflow",
-        "maxAge": "20h",
-        "cache": {"configMap": {"name": "pargo-memoize"}},
-    }
+    assert memo.memoize["key"].startswith("memoflow-")
+    assert memo.memoize["maxAge"] == "20h"
+    assert memo.memoize["cache"] == {"configMap": {"name": "pargo-memoize"}}
+    # A changed child definition gets a fresh cache entry.
+    changed = Workflow.new("memoflow", memoize="20h", parameters={"x": 1}).next(void)
+    (changed_memo,) = [
+        t
+        for t in Workflow.new("g").next(changed).to_argo().spec.templates
+        if getattr(t, "memoize", None)
+    ]
+    assert changed_memo.memoize["key"] != memo.memoize["key"]
     assert memo.synchronization == {"mutexes": [{"name": "memoflow"}]}
     assert templates["step-0-workflow-plainflow"].memoize is None
     assert templates["step-0-workflow-plainflow"].synchronization is None

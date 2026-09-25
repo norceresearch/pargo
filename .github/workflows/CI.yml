@@ -168,10 +168,16 @@ jobs:
         # -n 3: three workflows in flight at once, which one kind node handles
         # comfortably even with the foreach examples fanning out.
         run: uv run pytest tests/test_integration.py -v -n 3
+        # Below the job timeout, so a hang fails this step and the dump still runs.
+        timeout-minutes: 12
 
       - name: Dump workflow state on failure
         if: failure()
-        run: kubectl get workflows,pods -n "$PARGO_NAMESPACE" -o wide
+        run: |
+          kubectl get workflows,pods,events -n "$PARGO_NAMESPACE" -o wide
+          # Pods are GC'd on completion, so the node messages here are all that's left.
+          for wf in $(kubectl get workflows -n "$PARGO_NAMESPACE" -o name); do argo get "${wf#*/}" -n "$PARGO_NAMESPACE"; done
+          kubectl logs -n "$PARGO_NAMESPACE" deployment/workflow-controller --tail=200
 
   docs:
     name: Build documentation
